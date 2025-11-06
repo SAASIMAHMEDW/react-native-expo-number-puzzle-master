@@ -1,6 +1,12 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
-  }
+    "strict": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@shared/*": ["shared/*"],
+      "@screens/*": ["screens/*"]
+    }
+  },
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js"]
 }
