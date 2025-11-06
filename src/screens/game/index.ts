@@ -1,3 +1,3 @@
-import MainGameScreen from "./main.game.screen";
+import MainGameScreen from "./MainGameScreen";
 
 export default MainGameScreen;
