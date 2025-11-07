@@ -1,3 +1,4 @@
+import { useFonts } from "expo-font";
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 
@@ -7,9 +8,17 @@ interface GameCellProps {
 }
 
 const GameCell: React.FC<GameCellProps> = ({ value, color }) => {
+  const [fontsLoaded, fontError] = useFonts({
+    "TitanOne-Regular": require("@assets/fonts/TitanOne-Regular.ttf"),
+  });
+  if (!fontsLoaded || fontError) {
+    return null;
+  }
   return (
     <View style={styles.cell}>
-      <Text style={[styles.text, { color }]}>{value}</Text>
+      <Text style={[styles.text, { color, fontFamily: "TitanOne-Regular" }]}>
+        {value}
+      </Text>
     </View>
   );
 };
@@ -23,7 +32,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   text: {
-    fontSize: 28,
+    fontSize: 35,
     fontWeight: "800",
   },
 });

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "number-puzzle",
-    "slug": "number-puzzle",
+    "slug": "number-master",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -24,10 +24,50 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.aasimahmedsiddiqui_expo.numbermaster"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/TitanOne-Regular.ttf",
+            "./assets/fonts/MomoTrustDisplay-Regular.ttf"
+          ],
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "TitanOne-Regular",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/TitanOne-Regular.ttf",
+                    "weight": 400
+                  }
+                ]
+              },
+              {
+                "fontFamily": "MomoTrustDisplay-Regular",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/MomoTrustDisplay-Regular.ttf",
+                    "weight": 400
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ee9a0b33-1332-43ee-8804-f66359ea37f1"
+      }
+    },
+    "owner": "aasimahmedsiddiqui_expo"
   }
 }

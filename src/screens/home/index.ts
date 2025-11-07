@@ -1,3 +1,3 @@
-import MainHomeScreen from "./main.home.screen";
+import MainHomeScreen from "./MainHomeScreen";
 
 export default MainHomeScreen;

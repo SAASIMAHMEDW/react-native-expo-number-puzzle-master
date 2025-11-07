@@ -1,0 +1,3 @@
+npx eas-cli@latest build --platform android
+
+npx eas-cli@latest build --platform android --profile preview

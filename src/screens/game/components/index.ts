@@ -5,4 +5,15 @@ import GameAddButton from "./GameAddButton";
 
 import GameGrid from "./GameGrid";
 
-export { GameBackground, GameStars, GameCard, GameAddButton, GameGrid };
+import GameGoBack from "./GameGoBack";
+import GameEnd from "./GameEnd";
+
+export {
+  GameBackground,
+  GameStars,
+  GameCard,
+  GameAddButton,
+  GameGrid,
+  GameGoBack,
+  GameEnd,
+};

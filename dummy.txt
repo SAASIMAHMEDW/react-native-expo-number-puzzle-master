@@ -1,0 +1,6 @@
+      {/* <HomeButton
+        title="Continue"
+        scolor="#7BFF5C"
+        ecolor="#2EBE00"
+        onPress={() => {}}
+      /> */}

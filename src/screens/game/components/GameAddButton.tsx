@@ -1,40 +1,43 @@
+// GameAddButton.tsx
 import React from "react";
 import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 const { width, height } = Dimensions.get("window");
 
-interface GameAddButtonProps {
+interface Props {
   count?: number;
   onPress?: () => void;
+  disabled?: boolean;
 }
 
-const GameAddButton: React.FC<GameAddButtonProps> = ({
-  count = 6,
-  onPress,
-}) => {
+const GameAddButton: React.FC<Props> = ({ count = 0, onPress, disabled }) => {
   return (
-    <Pressable style={styles.container} onPress={onPress}>
-      {/* Plus symbol */}
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.container,
+        disabled && { opacity: 0.45 },
+        pressed && !disabled ? { transform: [{ scale: 0.97 }] } : null,
+      ]}
+    >
       <View style={styles.plusWrapper}>
-        {/* Horizontal bar */}
         <LinearGradient
-          colors={["#59D3FF", "#0090FF"]}
+          colors={count === 0 ? ["#373636ff", "#989898ff"] : ["#59D3FF", "#0090FF"]}
           start={{ x: 0.2, y: 0 }}
           end={{ x: 0.8, y: 1 }}
           style={[styles.bar, styles.horizontal]}
         />
-        {/* Vertical bar */}
         <LinearGradient
-          colors={["#59D3FF", "#0090FF"]}
+          colors={count === 0 ? ["#373636ff", "#989898ff"] : ["#59D3FF", "#0090FF"]}
           start={{ x: 0.2, y: 0 }}
           end={{ x: 0.8, y: 1 }}
           style={[styles.bar, styles.vertical]}
         />
       </View>
 
-      {/* Notification badge */}
-      {typeof count === "number" && count > 0 && (
+      {typeof count === "number" && count >= 0 && (
         <LinearGradient
           colors={["#FF4B4B", "#C80000"]}
           start={{ x: 0.2, y: 0.1 }}
@@ -75,16 +78,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
   },
-  horizontal: {
-    width: 60,
-    height: 20,
-    borderRadius: 10,
-  },
-  vertical: {
-    width: 20,
-    height: 60,
-    borderRadius: 10,
-  },
+  horizontal: { width: 60, height: 20, borderRadius: 10 },
+  vertical: { width: 20, height: 60, borderRadius: 10 },
   badge: {
     position: "absolute",
     top: 4,
@@ -100,9 +95,5 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  badgeText: {
-    color: "#fff",
-    fontWeight: "900",
-    fontSize: 15,
-  },
+  badgeText: { color: "#fff", fontWeight: "900", fontSize: 15 },
 });

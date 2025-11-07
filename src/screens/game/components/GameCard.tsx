@@ -1,16 +1,23 @@
 import React from "react";
 import { View, Text, StyleSheet, Dimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useFonts } from "expo-font";
 
 const { height } = Dimensions.get("window");
 
 interface GameCardProps {
   stage: number;
   score: number;
-  timer: string; // e.g. "01:23"
+  timer: string;
 }
 
 const GameCard: React.FC<GameCardProps> = ({ stage, score, timer }) => {
+  const [fontsLoaded, fontError] = useFonts({
+    "MomoTrustDisplay-Regular": require("@assets/fonts/MomoTrustDisplay-Regular.ttf"),
+  });
+  if (!fontsLoaded || fontError) {
+    return null;
+  }
   return (
     <View style={styles.container}>
       {/* Content */}
@@ -91,7 +98,8 @@ const styles = StyleSheet.create({
   },
   scoreText: {
     fontSize: 48,
-    fontWeight: "800",
+    fontFamily: "MomoTrustDisplay-Regular",
+    fontWeight: "400",
     color: "#ffcf40",
     textShadowColor: "rgba(255, 210, 60, 0.8)",
     textShadowOffset: { width: 0, height: 0 },
