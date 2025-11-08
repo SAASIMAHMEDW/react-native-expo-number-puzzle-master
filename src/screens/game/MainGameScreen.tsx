@@ -39,7 +39,7 @@ const { height, width } = Dimensions.get("window");
 const INITIAL_ROWS = 9;
 const INITIAL_COLS = 9;
 const INITIAL_FILLED_ROWS = 3;
-const ADD_BUTTON_USES = 3;
+const ADD_BUTTON_USES = 6;
 
 const TOTAL_SECONDS = 120; // 2 minutes
 
@@ -156,12 +156,6 @@ const MainGameScreen = ({ navigation }: Props) => {
 
   const formattedTime = `${minutes}:${secs}`;
 
-  useEffect(() => {
-    if (usesLeft <= 0) {
-      setGameEnd(true);
-    }
-  }, [usesLeft]);
-
   // timer
   useEffect(() => {
     if (!gameEnd) return;
@@ -218,6 +212,7 @@ export default MainGameScreen;
 
 const styles = StyleSheet.create({
   container: {
+    position: "relative",
     flex: 1,
     width: "100%",
     height: "100%",
@@ -227,12 +222,11 @@ const styles = StyleSheet.create({
   gridWrapper: {
     position: "absolute",
     top: height * 0.15 + height * 0.03, // 3% gap below GameCard
-    width: width * 0.98,
-    height: height * 0.8,
-    alignSelf: "center",
-    justifyContent: "flex-start",
-    alignItems: "center",
+    width: "100%",
+    height: "70%",
     paddingHorizontal: width * 0.04, // 4% side gap
     zIndex: 10,
+    borderBlockColor: "#fff",
+    borderWidth: 10,
   },
 });
