@@ -9,11 +9,29 @@ import {
   GameStars,
 } from "./components"; // keep your imports
 import { GameGrid } from "./components";
-import { CellData } from "./types"; // your CellData type
-import generateRow from "./utils/generateRow"; // your helper (returns CellData[])
-import makeId from "./utils/makeId";
+
 import { RootStackParamList } from "@shared/types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+const makeId = (r: number, c: number) =>
+  `${r}-${c}-${Math.random().toString(36).slice(2, 6)}`;
+
+const generateRow = (rowIndex: number, cols: number): CellData[] =>
+  Array.from({ length: cols }).map((_, c) => ({
+    id: makeId(rowIndex, c),
+    row: rowIndex,
+    col: c,
+    value: Math.floor(Math.random() * 10),
+    faded: false,
+  }));
+
+export interface CellData {
+  id: string;
+  row: number;
+  col: number;
+  value: number | null;
+  faded: boolean;
+}
 
 type Props = NativeStackScreenProps<RootStackParamList, "Game">;
 const { height, width } = Dimensions.get("window");
@@ -23,7 +41,12 @@ const INITIAL_COLS = 9;
 const INITIAL_FILLED_ROWS = 3;
 const ADD_BUTTON_USES = 3;
 
+const TOTAL_SECONDS = 120; // 2 minutes
+
 const MainGameScreen = ({ navigation }: Props) => {
+  const [gameId, setGameId] = useState(1); // forces a fresh grid when changed
+  const [score, setScore] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS);
   // Game End screen state
   const [gameEnd, setGameEnd] = useState<boolean>(false);
   // Amount we will add next (starts equal to initial filled rows)
@@ -126,11 +149,34 @@ const MainGameScreen = ({ navigation }: Props) => {
     setNextAddCount((n) => n * 2);
   }, [usesLeft, nextAddCount]);
 
+  const minutes = Math.floor(secondsLeft / 60)
+    .toString()
+    .padStart(2, "0");
+  const secs = (secondsLeft % 60).toString().padStart(2, "0");
+
+  const formattedTime = `${minutes}:${secs}`;
+
   useEffect(() => {
     if (usesLeft <= 0) {
       setGameEnd(true);
     }
   }, [usesLeft]);
+
+  // timer
+  useEffect(() => {
+    if (!gameEnd) return;
+    const id = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          clearInterval(id);
+          setGameEnd(true);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [gameEnd]);
 
   if (gameEnd)
     return (
@@ -146,7 +192,7 @@ const MainGameScreen = ({ navigation }: Props) => {
       <GameBackground />
       <GameGoBack onPress={() => navigation.goBack()} />
       <GameStars />
-      <GameCard stage={1} score={50} timer="01:23" />
+      <GameCard stage={1} score={score} timer={formattedTime} />
 
       <View style={styles.gridWrapper}>
         {/* ScrollView so the grid can be scrolled if taller than wrapper */}
