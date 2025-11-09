@@ -4,6 +4,7 @@ const generateRandomGrid = (rows: number, cols: number) => {
     const row: number[] = [];
     for (let c = 0; c < cols; c++) {
       row.push(Math.ceil(Math.random() * 8) + 1);
+
     }
     temp.push(row);
   }

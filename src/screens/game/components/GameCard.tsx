@@ -3,13 +3,17 @@ import { View, Text, StyleSheet, Dimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from "expo-font";
 
-const { height } = Dimensions.get("window");
+const { height, width } = Dimensions.get("window");
 
 interface GameCardProps {
   stage: number;
   score: number;
   timer: string;
 }
+
+const labelFontSize = width * 0.04;
+const ValueFontSize = width * 0.06;
+const ScoreFontSize = width * 0.1;
 
 const GameCard: React.FC<GameCardProps> = ({ stage, score, timer }) => {
   const [fontsLoaded, fontError] = useFonts({
@@ -82,12 +86,13 @@ const styles = StyleSheet.create({
   },
   label: {
     color: "#fff",
-    fontSize: 14,
-    opacity: 0.8,
+    fontSize: labelFontSize,
+    opacity: 1,
+    fontFamily: "Typographica-Regular",
   },
   value: {
     color: "#fff",
-    fontSize: 18,
+    fontSize: ValueFontSize,
     fontWeight: "600",
     marginTop: 2,
   },
@@ -97,7 +102,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scoreText: {
-    fontSize: 48,
+    fontSize: ScoreFontSize,
     fontFamily: "MomoTrustDisplay-Regular",
     fontWeight: "400",
     color: "#ffcf40",

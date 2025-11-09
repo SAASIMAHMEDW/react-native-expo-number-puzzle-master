@@ -24,13 +24,17 @@ const GameAddButton: React.FC<Props> = ({ count = 0, onPress, disabled }) => {
     >
       <View style={styles.plusWrapper}>
         <LinearGradient
-          colors={count === 0 ? ["#373636ff", "#989898ff"] : ["#59D3FF", "#0090FF"]}
+          colors={
+            count === 0 ? ["#373636ff", "#989898ff"] : ["#59D3FF", "#0090FF"]
+          }
           start={{ x: 0.2, y: 0 }}
           end={{ x: 0.8, y: 1 }}
           style={[styles.bar, styles.horizontal]}
         />
         <LinearGradient
-          colors={count === 0 ? ["#373636ff", "#989898ff"] : ["#59D3FF", "#0090FF"]}
+          colors={
+            count === 0 ? ["#373636ff", "#989898ff"] : ["#59D3FF", "#0090FF"]
+          }
           start={{ x: 0.2, y: 0 }}
           end={{ x: 0.8, y: 1 }}
           style={[styles.bar, styles.vertical]}
@@ -55,14 +59,17 @@ export default GameAddButton;
 
 const styles = StyleSheet.create({
   container: {
-    position: "absolute",
-    bottom: height * 0.1,
-    left: width * 0.1,
-    justifyContent: "center",
-    alignItems: "center",
-    width: 70,
-    height: 70,
-    zIndex: 100,
+    position: "relative",
+    // bottom: height * 0.1,
+    // left: width * 0.1,
+    // justifyContent: "center",
+    // alignItems: "center",
+    // width: 70,
+    // height: 70,
+    // zIndex: 100,
+    // alignSelf: "center",
+    // marginTop: 20,
+    // marginBottom: 24,
   },
   plusWrapper: {
     justifyContent: "center",

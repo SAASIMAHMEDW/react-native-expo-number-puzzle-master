@@ -7,11 +7,18 @@ const { width, height } = Dimensions.get("window");
 
 type GameEndProps = {
   message?: string;
+  score?: number;
+
   onPressRestart?: () => void;
   onPressHome?: () => void;
 };
 
-const GameEnd = ({ message, onPressRestart, onPressHome }: GameEndProps) => {
+const GameEnd = ({
+  message,
+  score,
+  onPressRestart,
+  onPressHome,
+}: GameEndProps) => {
   return (
     <View style={styles.container}>
       {/* Background gradient */}
@@ -28,6 +35,11 @@ const GameEnd = ({ message, onPressRestart, onPressHome }: GameEndProps) => {
         <Text style={styles.subheading}>
           {message || "Your journey ends here..."}
         </Text>
+
+        <View style={styles.scoreContainer}>
+          <Text style={styles.scoreText}>Score:</Text>
+          <Text style={styles.scoreValue}>{score}</Text>
+        </View>
 
         <View style={styles.buttonRow}>
           <Button
@@ -77,7 +89,7 @@ const styles = StyleSheet.create({
     color: "#FFD85C",
     textShadowColor: "rgba(255, 220, 100, 0.7)",
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 12,
+    textShadowRadius: 6,
     marginBottom: 12,
   },
   subheading: {
@@ -95,5 +107,19 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     marginHorizontal: 6,
+  },
+  scoreContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  scoreText: {
+    fontSize: 24,
+    color: "#ffffffcc",
+    marginRight: 10,
+  },
+  scoreValue: {
+    fontSize: 24,
+    color: "#ffffffcc",
   },
 });

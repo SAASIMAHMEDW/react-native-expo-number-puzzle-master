@@ -1,3 +1,4 @@
+// MainGameScreen.tsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View, Dimensions, ScrollView } from "react-native";
 import {
@@ -7,11 +8,20 @@ import {
   GameEnd,
   GameGoBack,
   GameStars,
-} from "./components"; // keep your imports
-import { GameGrid } from "./components";
-
+  GameGrid,
+} from "./components";
 import { RootStackParamList } from "@shared/types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+
+const { height, width } = Dimensions.get("window");
+const PADDING_HORIZONTAL = width * 0.03;
+const TOP_BAR_HEIGHT = height * 0.2;
+
+const INITIAL_ROWS = 9;
+const INITIAL_COLS = 9;
+const INITIAL_FILLED_ROWS = 3;
+const ADD_BUTTON_USES = 6;
+const TOTAL_SECONDS = 120;
 
 const makeId = (r: number, c: number) =>
   `${r}-${c}-${Math.random().toString(36).slice(2, 6)}`;
@@ -21,7 +31,7 @@ const generateRow = (rowIndex: number, cols: number): CellData[] =>
     id: makeId(rowIndex, c),
     row: rowIndex,
     col: c,
-    value: Math.floor(Math.random() * 10),
+    value: Math.ceil(Math.random() * 9),
     faded: false,
   }));
 
@@ -34,53 +44,41 @@ export interface CellData {
 }
 
 type Props = NativeStackScreenProps<RootStackParamList, "Game">;
-const { height, width } = Dimensions.get("window");
-
-const INITIAL_ROWS = 9;
-const INITIAL_COLS = 9;
-const INITIAL_FILLED_ROWS = 3;
-const ADD_BUTTON_USES = 6;
-
-const TOTAL_SECONDS = 120; // 2 minutes
 
 const MainGameScreen = ({ navigation }: Props) => {
-  const [gameId, setGameId] = useState(1); // forces a fresh grid when changed
+  const [gameId, setGameId] = useState(1);
+  // Game End Screen Message States
+  const [gameEndMessage, setGameEndMessage] = useState("");
   const [score, setScore] = useState(0);
+  const [gameStage, setGameStage] = useState(1);
   const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS);
-  // Game End screen state
-  const [gameEnd, setGameEnd] = useState<boolean>(false);
-  // Amount we will add next (starts equal to initial filled rows)
-  const [nextAddCount, setNextAddCount] = useState<number>(INITIAL_FILLED_ROWS);
-  // Number of times add button has been clicked
-  const [usesLeft, setUsesLeft] = useState<number>(ADD_BUTTON_USES);
+  const [gameEnd, setGameEnd] = useState(false);
+  const [nextAddCount, setNextAddCount] = useState(INITIAL_FILLED_ROWS);
+  const [usesLeft, setUsesLeft] = useState(ADD_BUTTON_USES);
 
-  // gridRows: array of CellData[] rows. We'll keep an *extra empty row* at the end for your fade.
   const initialGrid = useMemo(() => {
-    // create INITIAL_ROWS rows, but only fill values for first INITIAL_FILLED_ROWS
     const rows: CellData[][] = [];
     for (let r = 0; r < INITIAL_ROWS; r++) {
       if (r < INITIAL_FILLED_ROWS) {
-        rows.push(generateRow(r, INITIAL_COLS)); // full row with random values
+        rows.push(generateRow(r, INITIAL_COLS));
       } else {
-        // create empty row (value 0 or null — we'll use null to represent empty)
         rows.push(
           Array.from({ length: INITIAL_COLS }).map((_, c) => ({
             id: makeId(r, c),
             row: r,
             col: c,
-            value: null as number | null,
+            value: null,
             faded: false,
           }))
         );
       }
     }
-    // ensure one extra empty row at end for fade
     rows.push(
       Array.from({ length: INITIAL_COLS }).map((_, c) => ({
         id: makeId(INITIAL_ROWS, c),
         row: INITIAL_ROWS,
         col: c,
-        value: null as number | null,
+        value: null,
         faded: false,
       }))
     );
@@ -91,23 +89,15 @@ const MainGameScreen = ({ navigation }: Props) => {
 
   const handleAddPress = useCallback(() => {
     if (usesLeft <= 0) return;
-
     setGridRows((prev) => {
-      // how many rows to fill now = nextAddCount
       let toFill = nextAddCount;
-      // compute total rows currently available excluding the extra empty final row
-      const existingRows = prev.length - 1; // last one is extra empty
-      // count currently filled rows (rows where first cell not null)
+      const existingRows = prev.length - 1; // Exclude extra row
       let filledCount = prev.reduce(
         (acc, row) => (row[0]?.value != null ? acc + 1 : acc),
         0
       );
-
-      // target filled rows after adding:
       const targetFilled = filledCount + toFill;
-
-      // If we don't have enough rows, append empty rows to reach targetFilled (plus keep one extra)
-      let newRows = prev.slice(0, prev.length - 1); // drop final extra for manipulation
+      let newRows = prev.slice(0, prev.length - 1);
       while (newRows.length < targetFilled) {
         const newRowIndex = newRows.length;
         newRows.push(
@@ -115,36 +105,26 @@ const MainGameScreen = ({ navigation }: Props) => {
             id: makeId(newRowIndex, c),
             row: newRowIndex,
             col: c,
-            value: null as number | null,
+            value: null,
             faded: false,
           }))
         );
       }
-
-      // Fill rows from filledCount -> targetFilled-1
       for (let r = filledCount; r < targetFilled; r++) {
-        // Generate a new random row
-        const generated = generateRow(r, INITIAL_COLS);
-        // Keep previous rows as-is, replace this row's values
-        newRows[r] = generated;
+        newRows[r] = generateRow(r, INITIAL_COLS);
       }
-
-      // push back the extra empty row
       const extraRowIndex = newRows.length;
       newRows.push(
         Array.from({ length: INITIAL_COLS }).map((_, c) => ({
           id: makeId(extraRowIndex, c),
           row: extraRowIndex,
           col: c,
-          value: null as number | null,
+          value: null,
           faded: false,
         }))
       );
-
       return newRows;
     });
-
-    // decrement uses and double nextAddCount
     setUsesLeft((u) => Math.max(0, u - 1));
     setNextAddCount((n) => n * 2);
   }, [usesLeft, nextAddCount]);
@@ -153,10 +133,8 @@ const MainGameScreen = ({ navigation }: Props) => {
     .toString()
     .padStart(2, "0");
   const secs = (secondsLeft % 60).toString().padStart(2, "0");
-
   const formattedTime = `${minutes}:${secs}`;
 
-  // timer
   useEffect(() => {
     if (!gameEnd) return;
     const id = setInterval(() => {
@@ -175,7 +153,8 @@ const MainGameScreen = ({ navigation }: Props) => {
   if (gameEnd)
     return (
       <GameEnd
-        message="Timer Ends"
+        message={gameEndMessage}
+        score={score}
         onPressRestart={() => navigation.navigate("Game")}
         onPressHome={() => navigation.navigate("Home")}
       />
@@ -184,26 +163,39 @@ const MainGameScreen = ({ navigation }: Props) => {
   return (
     <View style={styles.container}>
       <GameBackground />
-      <GameGoBack onPress={() => navigation.goBack()} />
       <GameStars />
-      <GameCard stage={1} score={score} timer={formattedTime} />
 
-      <View style={styles.gridWrapper}>
-        {/* ScrollView so the grid can be scrolled if taller than wrapper */}
-        <ScrollView
-          style={{ width: "100%" }}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ alignItems: "center" }}
-        >
-          <GameGrid rowsData={gridRows} cols={INITIAL_COLS} />
-        </ScrollView>
+      {/* GoBack always at the very top left (fixed) */}
+      <GameGoBack onPress={() => navigation.goBack()} />
+
+      {/* Game State Card */}
+      <View style={styles.topBar}>
+        <GameCard stage={gameStage} score={score} timer={formattedTime} />
       </View>
 
-      <GameAddButton
-        count={usesLeft}
-        onPress={handleAddPress}
-        disabled={usesLeft <= 0}
-      />
+      {/* GameGrid in remaining area, AddButton below it */}
+      <View style={styles.gridArea}>
+        <ScrollView
+          contentContainerStyle={styles.gridContent}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
+          <GameGrid
+            key={gameId}
+            rowsData={gridRows}
+            onScore={(d) => setScore((s) => s + d)}
+            cols={INITIAL_COLS}
+            disabled={!!gameEnd}
+          />
+        </ScrollView>
+      </View>
+      <View style={styles.addButtonContainer}>
+        <GameAddButton
+          count={usesLeft}
+          onPress={handleAddPress}
+          disabled={usesLeft <= 0}
+        />
+      </View>
     </View>
   );
 };
@@ -212,21 +204,47 @@ export default MainGameScreen;
 
 const styles = StyleSheet.create({
   container: {
-    position: "relative",
     flex: 1,
+    position: "relative",
     width: "100%",
     height: "100%",
-    backgroundColor: "#05000d",
-    overflow: "hidden",
   },
-  gridWrapper: {
+  topBar: {
     position: "absolute",
-    top: height * 0.15 + height * 0.03, // 3% gap below GameCard
+    left: 0,
+    top: 0,
     width: "100%",
-    height: "70%",
-    paddingHorizontal: width * 0.04, // 4% side gap
+    height: TOP_BAR_HEIGHT - 22,
     zIndex: 10,
-    borderBlockColor: "#fff",
-    borderWidth: 10,
+    justifyContent: "flex-end",
+  },
+  gridArea: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: TOP_BAR_HEIGHT - 15,
+    bottom: 0,
+    paddingHorizontal: PADDING_HORIZONTAL,
+    zIndex: 10,
+    height: "65%",
+  },
+  gridContent: {
+    // alignItems: "center",
+    // paddingBottom: 90,
+    // paddingTop: 10,
+    // height: "100%",
+    // borderBlockColor: "yellow",
+    // borderWidth: 5,
+  },
+  addButtonContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: "flex-start",
+    paddingHorizontal: PADDING_HORIZONTAL,
+    justifyContent: "center",
+    width: "100%",
+    height: "16%",
   },
 });
