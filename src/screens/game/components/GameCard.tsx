@@ -9,22 +9,21 @@ interface GameCardProps {
   stage: number;
   score: number;
   timer: string;
+  target: number;
 }
 
-const labelFontSize = width * 0.04;
-const ValueFontSize = width * 0.06;
-const ScoreFontSize = width * 0.1;
+const labelFontSize = width * 0.035;
+const valueFontSize = width * 0.05;
+const scoreFontSize = width * 0.09;
 
-const GameCard: React.FC<GameCardProps> = ({ stage, score, timer }) => {
+const GameCard: React.FC<GameCardProps> = ({ stage, score, timer, target }) => {
   const [fontsLoaded, fontError] = useFonts({
     "MomoTrustDisplay-Regular": require("@assets/fonts/MomoTrustDisplay-Regular.ttf"),
   });
-  if (!fontsLoaded || fontError) {
-    return null;
-  }
+  if (!fontsLoaded || fontError) return null;
+
   return (
     <View style={styles.container}>
-      {/* Content */}
       <View style={styles.row}>
         {/* Left: Stage */}
         <View style={styles.sideContainer}>
@@ -32,8 +31,11 @@ const GameCard: React.FC<GameCardProps> = ({ stage, score, timer }) => {
           <Text style={styles.value}>{stage}</Text>
         </View>
 
-        {/* Center: Glowing Score */}
+        {/* Center: Target + Score (absolute centered to prevent flicker) */}
         <View style={styles.centerContainer}>
+          <Text style={styles.targetLabel}>
+            Target: <Text style={styles.targetValue}>{target}</Text>
+          </Text>
           <Text style={styles.scoreText}>{score}</Text>
         </View>
 
@@ -71,6 +73,7 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     zIndex: 20,
   },
+
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -78,38 +81,64 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flex: 1,
   },
+
+  // Fixed width sides to prevent layout shifts
   sideContainer: {
+    width: width * 0.25,
     alignItems: "flex-start",
   },
   sideContainerRight: {
+    width: width * 0.25,
     alignItems: "flex-end",
   },
+
   label: {
     color: "#fff",
     fontSize: labelFontSize,
-    opacity: 1,
     fontFamily: "Typographica-Regular",
   },
   value: {
     color: "#fff",
-    fontSize: ValueFontSize,
+    fontSize: valueFontSize,
     fontWeight: "600",
     marginTop: 2,
   },
+
   centerContainer: {
+    position: "absolute",
+    alignSelf: "center",
     alignItems: "center",
     justifyContent: "center",
-    flex: 1,
+    bottom: 5,
+    left: 0,
+    right: 0,
+  },
+  targetLabel: {
+    color: "#FFFFFFCC",
+    fontSize: labelFontSize,
+    // fontFamily: "Typographica-Regular",
+    marginBottom: 2,
+    position: "absolute",
+    bottom: 50,
+    fontWeight: "500",
+  },
+  targetValue: {
+    color: "#ffcf40",
+    textShadowColor: "rgba(255, 210, 60, 0.8)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
+    fontSize: valueFontSize,
+    fontWeight: "600",
   },
   scoreText: {
-    fontSize: ScoreFontSize,
+    fontSize: scoreFontSize,
     fontFamily: "MomoTrustDisplay-Regular",
-    fontWeight: "400",
     color: "#ffcf40",
     textShadowColor: "rgba(255, 210, 60, 0.8)",
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 12,
   },
+
   bottomBorder: {
     height: 2,
     width: "100%",

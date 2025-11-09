@@ -8,7 +8,6 @@ const { width, height } = Dimensions.get("window");
 type GameEndProps = {
   message?: string;
   score?: number;
-
   onPressRestart?: () => void;
   onPressHome?: () => void;
 };

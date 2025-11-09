@@ -9,22 +9,22 @@ import { SafeAreaView } from "react-native-safe-area-context";
 const Stack = createNativeStackNavigator<RootStackParamList>();
 export default function App() {
   return (
-    <SafeAreaView style={styles.container}>
-      <NavigationContainer>
-        <Stack.Navigator initialRouteName="Home">
-          <Stack.Screen
-            name="Home"
-            component={MainHomeScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen
-            name="Game"
-            component={MainGameScreen}
-            options={{ headerShown: false }}
-          />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaView>
+    // <SafeAreaView style={styles.container}>
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName="Home">
+        <Stack.Screen
+          name="Home"
+          component={MainHomeScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Game"
+          component={MainGameScreen}
+          options={{ headerShown: false }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+    // </SafeAreaView>
   );
 }
 

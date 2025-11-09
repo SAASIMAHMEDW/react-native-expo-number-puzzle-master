@@ -20,8 +20,9 @@ const TOP_BAR_HEIGHT = height * 0.2;
 const INITIAL_ROWS = 9;
 const INITIAL_COLS = 9;
 const INITIAL_FILLED_ROWS = 3;
-const ADD_BUTTON_USES = 6;
-const TOTAL_SECONDS = 120;
+const ADD_BUTTON_USES = 3;
+const TOTAL_SECONDS = 20;
+const STAGES = 3;
 
 const makeId = (r: number, c: number) =>
   `${r}-${c}-${Math.random().toString(36).slice(2, 6)}`;
@@ -32,6 +33,7 @@ const generateRow = (rowIndex: number, cols: number): CellData[] =>
     row: rowIndex,
     col: c,
     value: Math.ceil(Math.random() * 9),
+    // value: 2,
     faded: false,
   }));
 
@@ -47,14 +49,15 @@ type Props = NativeStackScreenProps<RootStackParamList, "Game">;
 
 const MainGameScreen = ({ navigation }: Props) => {
   const [gameId, setGameId] = useState(1);
-  // Game End Screen Message States
   const [gameEndMessage, setGameEndMessage] = useState("");
   const [score, setScore] = useState(0);
+  const [target, setTarget] = useState(10);
   const [gameStage, setGameStage] = useState(1);
   const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS);
   const [gameEnd, setGameEnd] = useState(false);
   const [nextAddCount, setNextAddCount] = useState(INITIAL_FILLED_ROWS);
   const [usesLeft, setUsesLeft] = useState(ADD_BUTTON_USES);
+  const [isAddingRows, setIsAddingRows] = useState(false);
 
   const initialGrid = useMemo(() => {
     const rows: CellData[][] = [];
@@ -73,61 +76,63 @@ const MainGameScreen = ({ navigation }: Props) => {
         );
       }
     }
-    rows.push(
-      Array.from({ length: INITIAL_COLS }).map((_, c) => ({
-        id: makeId(INITIAL_ROWS, c),
-        row: INITIAL_ROWS,
-        col: c,
-        value: null,
-        faded: false,
-      }))
-    );
     return rows;
   }, []);
 
   const [gridRows, setGridRows] = useState<CellData[][]>(initialGrid);
 
   const handleAddPress = useCallback(() => {
-    if (usesLeft <= 0) return;
-    setGridRows((prev) => {
-      let toFill = nextAddCount;
-      const existingRows = prev.length - 1; // Exclude extra row
-      let filledCount = prev.reduce(
-        (acc, row) => (row[0]?.value != null ? acc + 1 : acc),
-        0
-      );
-      const targetFilled = filledCount + toFill;
-      let newRows = prev.slice(0, prev.length - 1);
-      while (newRows.length < targetFilled) {
-        const newRowIndex = newRows.length;
-        newRows.push(
-          Array.from({ length: INITIAL_COLS }).map((_, c) => ({
-            id: makeId(newRowIndex, c),
-            row: newRowIndex,
-            col: c,
-            value: null,
-            faded: false,
-          }))
+    if (usesLeft <= 0 || isAddingRows) return;
+
+    setIsAddingRows(true);
+
+    // Simulate async row generation with timeout
+    setTimeout(() => {
+      setGridRows((prev) => {
+        let toFill = nextAddCount;
+        const existingRows = prev.length;
+        let filledCount = prev.reduce(
+          (acc, row) => (row[0]?.value != null ? acc + 1 : acc),
+          0
         );
-      }
-      for (let r = filledCount; r < targetFilled; r++) {
-        newRows[r] = generateRow(r, INITIAL_COLS);
-      }
-      const extraRowIndex = newRows.length;
-      newRows.push(
-        Array.from({ length: INITIAL_COLS }).map((_, c) => ({
-          id: makeId(extraRowIndex, c),
-          row: extraRowIndex,
-          col: c,
-          value: null,
-          faded: false,
-        }))
-      );
-      return newRows;
-    });
-    setUsesLeft((u) => Math.max(0, u - 1));
-    setNextAddCount((n) => n * 2);
-  }, [usesLeft, nextAddCount]);
+        const targetFilled = filledCount + toFill;
+        let newRows = [...prev];
+
+        // Add new rows if needed
+        while (newRows.length < targetFilled) {
+          const newRowIndex = newRows.length;
+          newRows.push(
+            Array.from({ length: INITIAL_COLS }).map((_, c) => ({
+              id: makeId(newRowIndex, c),
+              row: newRowIndex,
+              col: c,
+              value: null,
+              faded: false,
+            }))
+          );
+        }
+
+        // Fill rows with numbers
+        for (let r = filledCount; r < targetFilled; r++) {
+          newRows[r] = generateRow(r, INITIAL_COLS);
+        }
+
+        return newRows;
+      });
+
+      setUsesLeft((u) => Math.max(0, u - 1));
+      setNextAddCount((n) => n * 2);
+      setIsAddingRows(false);
+    }, 150); // Small delay to show loading state
+  }, [usesLeft, nextAddCount, isAddingRows]);
+
+  const handleScore = useCallback((delta: number) => {
+    setScore((s) => s + delta);
+  }, []);
+
+  const handleGridUpdate = useCallback((updatedRows: CellData[][]) => {
+    setGridRows(updatedRows);
+  }, []);
 
   const minutes = Math.floor(secondsLeft / 60)
     .toString()
@@ -150,33 +155,77 @@ const MainGameScreen = ({ navigation }: Props) => {
     return () => clearInterval(id);
   }, [gameEnd]);
 
-  if (gameEnd)
-    return (
-      <GameEnd
-        message={gameEndMessage}
-        score={score}
-        onPressRestart={() => navigation.navigate("Game")}
-        onPressHome={() => navigation.navigate("Home")}
-      />
-    );
+  useEffect(() => {
+    if (score === target) {
+      switch (gameStage) {
+        case 1:
+          setTarget((t) => t + 20);
+          setGameStage((s) => s + 1);
+          setSecondsLeft((prev) => prev + TOTAL_SECONDS * 2);
+          break;
+        case 2:
+          setTarget((t) => t + 40);
+          setGameStage((s) => s + 1);
+          setSecondsLeft((prev) => prev + TOTAL_SECONDS * 3);
+          break;
+        case 3:
+          setTarget((t) => t + 60);
+          setGameStage((s) => s + 1);
+          setSecondsLeft((prev) => prev + TOTAL_SECONDS * 4);
+          break;
+        default:
+          break;
+      }
+      setTarget((t) => t + 10);
+      setGameStage((s) => s + 1);
+      setSecondsLeft((prev) => prev + TOTAL_SECONDS * 2);
+    } else {
+      setSecondsLeft((prev) => prev + 3);
+    }
+  }, [score]);
+
+  const handlePressRestart = () => {
+    setGameId((g) => g + 1);
+    setGameEnd(false);
+    setScore(0);
+    setGameStage(1);
+    setSecondsLeft(TOTAL_SECONDS);
+    setNextAddCount(INITIAL_FILLED_ROWS);
+    setUsesLeft(ADD_BUTTON_USES);
+    setGridRows(initialGrid);
+    setGameEndMessage("");
+    setIsAddingRows(false);
+  };
 
   return (
     <View style={styles.container}>
+      {gameEnd && (
+        <GameEnd
+          message={gameEndMessage}
+          score={score}
+          onPressRestart={() => handlePressRestart()}
+          onPressHome={() => navigation.navigate("Home")}
+        />
+      )}
+
       <GameBackground />
       <GameStars />
 
-      {/* GoBack always at the very top left (fixed) */}
       <GameGoBack onPress={() => navigation.goBack()} />
 
-      {/* Game State Card */}
       <View style={styles.topBar}>
-        <GameCard stage={gameStage} score={score} timer={formattedTime} />
+        <GameCard
+          key={`${gameStage + score + formattedTime + target}`}
+          stage={gameStage}
+          score={score}
+          timer={formattedTime}
+          target={target}
+        />
       </View>
 
-      {/* GameGrid in remaining area, AddButton below it */}
       <View style={styles.gridArea}>
         <ScrollView
-          overScrollMode="never" //
+          overScrollMode="never"
           bounces={false}
           contentContainerStyle={styles.gridContent}
           showsVerticalScrollIndicator={false}
@@ -184,17 +233,19 @@ const MainGameScreen = ({ navigation }: Props) => {
           <GameGrid
             key={gameId}
             rowsData={gridRows}
-            onScore={(d) => setScore((s) => s + d)}
+            onScore={handleScore}
+            onGridUpdate={handleGridUpdate}
             cols={INITIAL_COLS}
-            disabled={!!gameEnd}
+            disabled={gameEnd}
           />
         </ScrollView>
       </View>
+
       <View style={styles.addButtonContainer}>
         <GameAddButton
           count={usesLeft}
           onPress={handleAddPress}
-          disabled={usesLeft <= 0}
+          disabled={usesLeft <= 0 || isAddingRows}
         />
       </View>
     </View>
@@ -230,12 +281,7 @@ const styles = StyleSheet.create({
     height: "68%",
   },
   gridContent: {
-    // alignItems: "center",
-    // paddingBottom: 90,
-    // paddingTop: 10,
-    // height: "100%",
-    // borderBlockColor: "yellow",
-    // borderWidth: 5,
+    flexGrow: 1,
   },
   addButtonContainer: {
     position: "absolute",
