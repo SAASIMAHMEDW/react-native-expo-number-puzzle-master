@@ -176,8 +176,9 @@ const MainGameScreen = ({ navigation }: Props) => {
       {/* GameGrid in remaining area, AddButton below it */}
       <View style={styles.gridArea}>
         <ScrollView
-          contentContainerStyle={styles.gridContent}
+          overScrollMode="never" //
           bounces={false}
+          contentContainerStyle={styles.gridContent}
           showsVerticalScrollIndicator={false}
         >
           <GameGrid
@@ -226,7 +227,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: PADDING_HORIZONTAL,
     zIndex: 10,
-    height: "65%",
+    height: "68%",
   },
   gridContent: {
     // alignItems: "center",

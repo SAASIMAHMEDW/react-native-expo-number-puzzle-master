@@ -36,14 +36,11 @@ const GameGrid: React.FC<Props> = ({ rowsData, cols, disabled, onScore }) => {
   const availableWidth = screenWidth * 0.94;
   const maxGridWidth = screenWidth * 0.92;
   const maxGridHeight = screenHeight * 0.8;
-  const cellWidth = maxGridWidth / cols;
-  const cellHeight = maxGridHeight / Math.max(1, rows - 1); // -1 if last is fade row
-  // const cellSize = Math.min(Math.max(Math.min(cellWidth, cellHeight), 40), 70);
+
   const cellSize = availableWidth / cols;
   const gridWidth = cellSize * cols;
-  const gridHeight = cellSize * rows;
+  const gridHeight = cellSize * (rows + 4);
 
-  // const fontSize = cellSize * 0.45;
   const fontSize = cellSize * 0.55;
 
   const handleSelect = (row: number, col: number, value: number | null) => {
@@ -51,7 +48,7 @@ const GameGrid: React.FC<Props> = ({ rowsData, cols, disabled, onScore }) => {
   };
 
   return (
-    <View style={[styles.gridContainer, { width: "100%", height: "100%" }]}>
+    <View style={[styles.gridContainer, { width: "100%", height: "130%" }]}>
       {/* border and lines  */}
       <View style={StyleSheet.absoluteFill}>
         {/* left/right/borders */}
@@ -82,7 +79,8 @@ const GameGrid: React.FC<Props> = ({ rowsData, cols, disabled, onScore }) => {
 
       {/* internal lines */}
       <View style={StyleSheet.absoluteFill}>
-        {Array.from({ length: cols + 1 }).map((_, i) => (
+        {/* VERTICAL LINES */}
+        {Array.from({ length: cols }).map((_, i) => (
           <LinearGradient
             key={`v-${i}`}
             colors={[
@@ -98,8 +96,9 @@ const GameGrid: React.FC<Props> = ({ rowsData, cols, disabled, onScore }) => {
             ]}
           />
         ))}
-        {Array.from({ length: rows + 1 }).map((_, i) => {
-          if (i === 0 || i === rows) {
+        {/* HORIZONTAL LINES */}
+        {Array.from({ length: rows + 4 }).map((_, i) => {
+          if (i === 0 || i === rows + 4 - 1) {
             // skip fade row
             return null;
           }
@@ -132,6 +131,7 @@ const GameGrid: React.FC<Props> = ({ rowsData, cols, disabled, onScore }) => {
                 <GameCell
                   key={cell.id}
                   value={cell.value as number}
+                  fontSize={fontSize}
                   row={cell.row}
                   col={cell.col}
                   isSelected={selected.some(
@@ -152,12 +152,9 @@ const GameGrid: React.FC<Props> = ({ rowsData, cols, disabled, onScore }) => {
 
 export default GameGrid;
 
-/* AnimatedCell: animates when value changes from null -> number */
-
 const styles = StyleSheet.create({
   gridContainer: {
-    borderBlockColor: "red",
-    borderWidth: 3,
+    overflow: "visible",
   },
   borderLine: { position: "absolute" },
   line: { position: "absolute" },

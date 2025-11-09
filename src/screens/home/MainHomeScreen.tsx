@@ -1,4 +1,4 @@
-import { Button, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { RootStackParamList } from "@shared/types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { HomeBackground, HomeButton } from "./components";
@@ -27,6 +27,7 @@ const styles = StyleSheet.create({
   gameMainContainer: {
     position: "relative",
     flex: 1,
+    // backgroundColor: "#0F0F2D",
   },
   gameSecondaryContainer: {
     position: "absolute",
