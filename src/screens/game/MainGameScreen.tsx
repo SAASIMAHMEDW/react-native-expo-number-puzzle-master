@@ -24,9 +24,9 @@ const TOP_BAR_HEIGHT = height * 0.2;
 
 // Stage configuration based on requirements
 const STAGE_CONFIG = {
-  1: { timeLimit: 20, targetScore: 20, addsBonusTime: true },
-  2: { timeLimit: 40, targetScore: 40, addsBonusTime: true },
-  3: { timeLimit: 60, targetScore: 30, addsBonusTime: false },
+  1: { timeLimit: 30, targetScore: 10, addsBonusTime: true },
+  2: { timeLimit: 60, targetScore: 20, addsBonusTime: true },
+  3: { timeLimit: 180, targetScore: 30, addsBonusTime: false },
 };
 
 type Props = NativeStackScreenProps<RootStackParamList, "Game">;
@@ -37,6 +37,7 @@ const MainGameScreen = ({ navigation }: Props) => {
   const [score, setScore] = useState(0);
   const [gameStage, setGameStage] = useState(1);
   const [secondsLeft, setSecondsLeft] = useState(STAGE_CONFIG[1].timeLimit);
+
   const [gameEnd, setGameEnd] = useState(false);
   const [nextAddCount, setNextAddCount] = useState(GRID.INITIAL_FILLED_ROWS);
   const [usesLeft, setUsesLeft] = useState(GRID.ADD_BUTTON_USES);
@@ -156,6 +157,7 @@ const MainGameScreen = ({ navigation }: Props) => {
 
     timerRef.current = setInterval(() => {
       setSecondsLeft((s) => {
+        if (isAddingRows) return s;
         const newTime = s - 1;
 
         // Check if time is up
@@ -192,36 +194,30 @@ const MainGameScreen = ({ navigation }: Props) => {
   useEffect(() => {
     if (gameEnd) return;
 
-    // Stage 1: Need to reach 20 points
+    // Check stage progression
+    // Stage 1: Need to reach 10 points
     if (gameStage === 1 && score >= STAGE_CONFIG[1].targetScore) {
       setGameStage(2);
       setSecondsLeft(STAGE_CONFIG[2].timeLimit);
       setUsesLeft((u) => u + 2);
-      showToast("🎉 Stage 1 Completed!", "success");
+      showToast("🎉 Stage 1 Completed! Stage 2 Target 20", "success");
+      setScore(0);
       timeWarningShown.current = false;
     }
-    // Stage 2: Need to reach 40 MORE points (total 60)
-    else if (
-      gameStage === 2 &&
-      score >= STAGE_CONFIG[1].targetScore + STAGE_CONFIG[2].targetScore
-    ) {
+    // Stage 2: Need to reach 20 points
+    else if (gameStage === 2 && score >= STAGE_CONFIG[2].targetScore) {
       setGameStage(3);
       setSecondsLeft(STAGE_CONFIG[3].timeLimit);
-      setUsesLeft((u) => u + 2);
-      showToast("🔥 Stage 2 Completed!", "success");
+      setUsesLeft((u) => u + 1);
+      showToast("🔥 Stage 2 Completed! Stage 3 Target 30", "success");
+      setScore(0);
       timeWarningShown.current = false;
     }
-    // Stage 3: Need to reach 30 MORE points (total 90)
-    else if (
-      gameStage === 3 &&
-      score >=
-        STAGE_CONFIG[1].targetScore +
-          STAGE_CONFIG[2].targetScore +
-          STAGE_CONFIG[3].targetScore
-    ) {
+    // Stage 3: Need to reach 30 points
+    else if (gameStage === 3 && score >= STAGE_CONFIG[3].targetScore) {
       setGameEnd(true);
       setGameEndMessage("🏆 Congratulations! You Won!");
-      showToast("🏆 Victory!", "success");
+      // showToast("🏆 Victory!", "success");
       if (timerRef.current) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -289,7 +285,7 @@ const MainGameScreen = ({ navigation }: Props) => {
                 onScore={handleScore}
                 onGridUpdate={handleGridUpdate}
                 cols={GRID.INITIAL_COLS}
-                disabled={false}
+                disabled={isAddingRows || gameEnd}
               />
             </ScrollView>
           </View>
@@ -307,7 +303,12 @@ const MainGameScreen = ({ navigation }: Props) => {
           message={gameEndMessage}
           score={score}
           onPressRestart={handlePressRestart}
-          onPressHome={() => navigation.navigate("Home")}
+          onPressHome={() =>
+            navigation.reset({
+              index: 0,
+              routes: [{ name: "Home" }],
+            })
+          }
         />
       )}
 

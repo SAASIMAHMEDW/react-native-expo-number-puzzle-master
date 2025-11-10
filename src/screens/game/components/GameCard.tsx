@@ -22,6 +22,9 @@ const GameCard: React.FC<GameCardProps> = ({ stage, score, timer, target }) => {
   });
   if (!fontsLoaded || fontError) return null;
 
+  const [minutes, seconds] = timer?.split(":").map(Number) || [0, 0];
+  const timerTextColor = seconds <= 10 ? "#ff0909ba" : "#fff";
+
   return (
     <View style={styles.container}>
       <View style={styles.row}>
@@ -42,7 +45,16 @@ const GameCard: React.FC<GameCardProps> = ({ stage, score, timer, target }) => {
         {/* Right: Timer */}
         <View style={styles.sideContainerRight}>
           <Text style={styles.label}>Timer</Text>
-          <Text style={styles.value}>{timer}</Text>
+          <Text
+            style={[
+              styles.value,
+              {
+                color: timerTextColor,
+              },
+            ]}
+          >
+            {timer}
+          </Text>
         </View>
       </View>
 
@@ -118,7 +130,7 @@ const styles = StyleSheet.create({
     // fontFamily: "Typographica-Regular",
     marginBottom: 2,
     position: "absolute",
-    bottom: 50,
+    bottom: "90%",
     fontWeight: "500",
   },
   targetValue: {

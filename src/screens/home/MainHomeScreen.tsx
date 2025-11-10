@@ -1,10 +1,4 @@
-import {
-  DimensionValue,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import { RootStackParamList } from "@shared/types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { HomeBackground, HomeButton } from "./components";
@@ -17,12 +11,6 @@ const MainHomeScreen = ({ navigation }: Props) => {
   return (
     <View style={[styles.gameMainContainer, { height, width }]}>
       <HomeBackground />
-
-      <View>
-        <Text>
-          Height {height}, Width {width}
-        </Text>
-      </View>
 
       <View style={styles.gameSecondaryContainer}>
         <HomeButton
