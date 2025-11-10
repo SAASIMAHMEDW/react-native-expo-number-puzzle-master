@@ -1,25 +1,11 @@
-// GameGrid.tsx
 import React, { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, Dimensions } from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withSequence,
-  Easing,
-} from "react-native-reanimated";
+
 import { LinearGradient } from "expo-linear-gradient";
 import GameCell from "./GameCell";
+import { CellData } from "../types";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
-
-export interface CellData {
-  id: string;
-  row: number;
-  col: number;
-  value: number | null;
-  faded: boolean;
-}
 
 interface Props {
   rowsData: CellData[][];

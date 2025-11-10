@@ -1,4 +1,3 @@
-// components/Toast.tsx
 import React, { useEffect } from "react";
 import { StyleSheet, Text } from "react-native";
 import Animated, {
@@ -6,9 +5,15 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withSpring,
-  withSequence,
   Easing,
 } from "react-native-reanimated";
+
+export interface ToastMessageType {
+  id: number;
+  message: string;
+  type: "success" | "error" | "warning" | "info";
+  position?: "top" | "bottom" | "bottom-right";
+}
 
 interface ToastProps {
   message: string;

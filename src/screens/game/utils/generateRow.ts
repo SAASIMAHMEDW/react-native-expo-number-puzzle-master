@@ -1,20 +1,12 @@
 import makeId from "./makeId";
-
-interface CellData {
-  id: string;
-  row: number;
-  col: number;
-  value: number;
-  faded: boolean;
-}
+import { CellData } from "../types";
 const generateRow = (rowIndex: number, cols: number): CellData[] =>
   Array.from({ length: cols }).map((_, c) => ({
     id: makeId(rowIndex, c),
     row: rowIndex,
     col: c,
-    value: Math.floor(Math.random() * 10),
+    value: Math.ceil(Math.random() * 9),
     faded: false,
   }));
-
 
 export default generateRow;

@@ -1,9 +1,6 @@
-// GameAddButton.tsx
 import React from "react";
 import { View, Text, StyleSheet, Pressable, Dimensions } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-
-const { width, height } = Dimensions.get("window");
 
 interface Props {
   count?: number;
@@ -60,16 +57,6 @@ export default GameAddButton;
 const styles = StyleSheet.create({
   container: {
     position: "relative",
-    // bottom: height * 0.1,
-    // left: width * 0.1,
-    // justifyContent: "center",
-    // alignItems: "center",
-    // width: 70,
-    // height: 70,
-    // zIndex: 100,
-    // alignSelf: "center",
-    // marginTop: 20,
-    // marginBottom: 24,
   },
   plusWrapper: {
     justifyContent: "center",

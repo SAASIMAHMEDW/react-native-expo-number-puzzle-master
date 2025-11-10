@@ -31,7 +31,7 @@ const GameCard: React.FC<GameCardProps> = ({ stage, score, timer, target }) => {
           <Text style={styles.value}>{stage}</Text>
         </View>
 
-        {/* Center: Target + Score (absolute centered to prevent flicker) */}
+        {/* Center: Target + Score */}
         <View style={styles.centerContainer}>
           <Text style={styles.targetLabel}>
             Target: <Text style={styles.targetValue}>{target}</Text>
@@ -82,7 +82,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Fixed width sides to prevent layout shifts
   sideContainer: {
     width: width * 0.25,
     alignItems: "flex-start",

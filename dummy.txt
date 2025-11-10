@@ -4,3 +4,5 @@
         ecolor="#2EBE00"
         onPress={() => {}}
       /> */}
+
+git commit -m "docs: Add comprehensive README.md"

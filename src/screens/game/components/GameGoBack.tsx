@@ -15,7 +15,7 @@ interface GameGoBackProps {
 
 const SIZE = 32; // touch target box
 const STROKE = 8; // chevron thickness
-const GLOW_STROKE = 12; // slightly larger for a soft glow layer
+const GLOW_STROKE = 12; // slightly larger for soft glow 
 
 const GameGoBack: React.FC<GameGoBackProps> = ({ onPress }) => {
   return (

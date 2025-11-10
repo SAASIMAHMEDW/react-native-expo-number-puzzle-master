@@ -1,11 +1,4 @@
-// MainGameScreen.tsx
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useRef,
-} from "react";
+import React, { useCallback, useEffect, useState, useRef } from "react";
 import { StyleSheet, View, Dimensions, ScrollView } from "react-native";
 import {
   GameAddButton,
@@ -20,14 +13,14 @@ import { RootStackParamList } from "@shared/types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Toast } from "@shared/components";
 
+import { makeId, generateRow, generateInitialGrid } from "./utils";
+import { CellData } from "./types";
+import { GRID } from "./constants";
+import { ToastMessageType } from "@shared/components/Toast";
+
 const { height, width } = Dimensions.get("window");
 const PADDING_HORIZONTAL = width * 0.03;
 const TOP_BAR_HEIGHT = height * 0.2;
-
-const INITIAL_ROWS = 9;
-const INITIAL_COLS = 9;
-const INITIAL_FILLED_ROWS = 3;
-const ADD_BUTTON_USES = 2;
 
 // Stage configuration based on requirements
 const STAGE_CONFIG = {
@@ -36,55 +29,7 @@ const STAGE_CONFIG = {
   3: { timeLimit: 60, targetScore: 30, addsBonusTime: false },
 };
 
-const makeId = (r: number, c: number) =>
-  `${r}-${c}-${Math.random().toString(36).slice(2, 6)}`;
-
-const generateRow = (rowIndex: number, cols: number): CellData[] =>
-  Array.from({ length: cols }).map((_, c) => ({
-    id: makeId(rowIndex, c),
-    row: rowIndex,
-    col: c,
-    value: Math.ceil(Math.random() * 9),
-    faded: false,
-  }));
-
-// Generate fresh grid
-const generateInitialGrid = (): CellData[][] => {
-  const rows: CellData[][] = [];
-  for (let r = 0; r < INITIAL_ROWS; r++) {
-    if (r < INITIAL_FILLED_ROWS) {
-      rows.push(generateRow(r, INITIAL_COLS));
-    } else {
-      rows.push(
-        Array.from({ length: INITIAL_COLS }).map((_, c) => ({
-          id: makeId(r, c),
-          row: r,
-          col: c,
-          value: null,
-          faded: false,
-        }))
-      );
-    }
-  }
-  return rows;
-};
-
-export interface CellData {
-  id: string;
-  row: number;
-  col: number;
-  value: number | null;
-  faded: boolean;
-}
-
 type Props = NativeStackScreenProps<RootStackParamList, "Game">;
-
-interface ToastMessage {
-  id: number;
-  message: string;
-  type: "success" | "error" | "warning" | "info";
-  position?: "top" | "bottom" | "bottom-right";
-}
 
 const MainGameScreen = ({ navigation }: Props) => {
   const [gameId, setGameId] = useState(1);
@@ -93,14 +38,20 @@ const MainGameScreen = ({ navigation }: Props) => {
   const [gameStage, setGameStage] = useState(1);
   const [secondsLeft, setSecondsLeft] = useState(STAGE_CONFIG[1].timeLimit);
   const [gameEnd, setGameEnd] = useState(false);
-  const [nextAddCount, setNextAddCount] = useState(INITIAL_FILLED_ROWS);
-  const [usesLeft, setUsesLeft] = useState(ADD_BUTTON_USES);
+  const [nextAddCount, setNextAddCount] = useState(GRID.INITIAL_FILLED_ROWS);
+  const [usesLeft, setUsesLeft] = useState(GRID.ADD_BUTTON_USES);
   const [isAddingRows, setIsAddingRows] = useState(false);
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [toasts, setToasts] = useState<ToastMessageType[]>([]);
   const toastIdCounter = useRef(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const timeWarningShown = useRef(false);
-  const [gridRows, setGridRows] = useState<CellData[][]>(generateInitialGrid());
+  const [gridRows, setGridRows] = useState<CellData[][]>(
+    generateInitialGrid(
+      GRID.INITIAL_ROWS,
+      GRID.INITIAL_COLS,
+      GRID.INITIAL_FILLED_ROWS
+    )
+  );
 
   const currentStageConfig =
     STAGE_CONFIG[gameStage as keyof typeof STAGE_CONFIG] || STAGE_CONFIG[3];
@@ -141,7 +92,7 @@ const MainGameScreen = ({ navigation }: Props) => {
         while (newRows.length < targetFilled) {
           const newRowIndex = newRows.length;
           newRows.push(
-            Array.from({ length: INITIAL_COLS }).map((_, c) => ({
+            Array.from({ length: GRID.INITIAL_COLS }).map((_, c) => ({
               id: makeId(newRowIndex, c),
               row: newRowIndex,
               col: c,
@@ -152,7 +103,7 @@ const MainGameScreen = ({ navigation }: Props) => {
         }
 
         for (let r = filledCount; r < targetFilled; r++) {
-          newRows[r] = generateRow(r, INITIAL_COLS);
+          newRows[r] = generateRow(r, GRID.INITIAL_COLS);
         }
 
         return newRows;
@@ -192,7 +143,7 @@ const MainGameScreen = ({ navigation }: Props) => {
   const secs = (secondsLeft % 60).toString().padStart(2, "0");
   const formattedTime = `${minutes}:${secs}`;
 
-  // Timer logic - FIXED
+  // Timer logic
   useEffect(() => {
     if (gameEnd) {
       // Clear timer when game ends
@@ -237,7 +188,7 @@ const MainGameScreen = ({ navigation }: Props) => {
     };
   }, [gameEnd, showToast]);
 
-  // Stage progression logic - FIXED
+  // Stage progression logic
   useEffect(() => {
     if (gameEnd) return;
 
@@ -278,7 +229,7 @@ const MainGameScreen = ({ navigation }: Props) => {
     }
   }, [score, gameStage, gameEnd, showToast]);
 
-  // FIXED: Complete restart function
+  // restart function
   const handlePressRestart = useCallback(() => {
     // Clear timer
     if (timerRef.current) {
@@ -292,9 +243,15 @@ const MainGameScreen = ({ navigation }: Props) => {
     setScore(0);
     setGameStage(1);
     setSecondsLeft(STAGE_CONFIG[1].timeLimit);
-    setNextAddCount(INITIAL_FILLED_ROWS);
-    setUsesLeft(ADD_BUTTON_USES);
-    setGridRows(generateInitialGrid()); // Generate NEW grid
+    setNextAddCount(GRID.INITIAL_FILLED_ROWS);
+    setUsesLeft(GRID.ADD_BUTTON_USES);
+    setGridRows(
+      generateInitialGrid(
+        GRID.INITIAL_ROWS,
+        GRID.INITIAL_COLS,
+        GRID.INITIAL_FILLED_ROWS
+      )
+    ); // Generate NEW grid
     setGameEndMessage("");
     setIsAddingRows(false);
     setToasts([]);
@@ -331,7 +288,7 @@ const MainGameScreen = ({ navigation }: Props) => {
                 rowsData={gridRows}
                 onScore={handleScore}
                 onGridUpdate={handleGridUpdate}
-                cols={INITIAL_COLS}
+                cols={GRID.INITIAL_COLS}
                 disabled={false}
               />
             </ScrollView>
