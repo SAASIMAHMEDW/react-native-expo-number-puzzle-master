@@ -84,6 +84,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     paddingTop: 40,
     zIndex: 20,
+    borderColor: "#1eff00ff",
+    borderWidth: 2,
   },
 
   row: {

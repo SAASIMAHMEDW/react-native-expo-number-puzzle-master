@@ -169,7 +169,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 4,
-    overflow: "visible", // allow glow to extend outside cell
+    overflow: "visible", 
+    borderColor: "#ff00d9ff",
+    borderWidth: 2,
   },
   numberContainer: {
     justifyContent: "center",

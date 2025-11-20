@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, View, Dimensions, ScrollView } from "react-native";
+
 import {
   GameAddButton,
   GameBackground,
@@ -9,251 +10,165 @@ import {
   GameStars,
   GameGrid,
 } from "./components";
+
+import { GRID } from "./constants";
+import { Toast } from "@shared/components";
+import { ToastMessageType } from "@shared/components/Toast";
+
 import { RootStackParamList } from "@shared/types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Toast } from "@shared/components";
-
-import { makeId, generateRow, generateInitialGrid } from "./utils";
-import { CellData } from "./types";
-import { GRID } from "./constants";
-import { ToastMessageType } from "@shared/components/Toast";
+import { Cell, GameState } from "./engine";
 
 const { height, width } = Dimensions.get("window");
 const PADDING_HORIZONTAL = width * 0.03;
 const TOP_BAR_HEIGHT = height * 0.2;
 
-// Stage configuration based on requirements
-const STAGE_CONFIG = {
-  1: { timeLimit: 30, targetScore: 10, addsBonusTime: true },
-  2: { timeLimit: 60, targetScore: 20, addsBonusTime: true },
-  3: { timeLimit: 180, targetScore: 30, addsBonusTime: false },
-};
-
 type Props = NativeStackScreenProps<RootStackParamList, "Game">;
 
 const MainGameScreen = ({ navigation }: Props) => {
-  const [gameId, setGameId] = useState(1);
-  const [gameEndMessage, setGameEndMessage] = useState("");
+  const [grid, setGrid] = useState<Cell[][]>([]);
+  const [selectedCells, setSelectedCells] = useState<Cell[]>([]);
+  const [shakingCells, setShakingCells] = useState<string[]>([]);
+
   const [score, setScore] = useState(0);
-  const [gameStage, setGameStage] = useState(1);
-  const [secondsLeft, setSecondsLeft] = useState(STAGE_CONFIG[1].timeLimit);
+  const [stage, setStage] = useState(1);
 
   const [gameEnd, setGameEnd] = useState(false);
-  const [nextAddCount, setNextAddCount] = useState(GRID.INITIAL_FILLED_ROWS);
-  const [usesLeft, setUsesLeft] = useState(GRID.ADD_BUTTON_USES);
-  const [isAddingRows, setIsAddingRows] = useState(false);
+  const [endMessage, setEndMessage] = useState("");
+
   const [toasts, setToasts] = useState<ToastMessageType[]>([]);
-  const toastIdCounter = useRef(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const timeWarningShown = useRef(false);
-  const [gridRows, setGridRows] = useState<CellData[][]>(
-    generateInitialGrid(
-      GRID.INITIAL_ROWS,
-      GRID.INITIAL_COLS,
-      GRID.INITIAL_FILLED_ROWS
-    )
-  );
+  const toastIdRef = useRef(0);
 
-  const currentStageConfig =
-    STAGE_CONFIG[gameStage as keyof typeof STAGE_CONFIG] || STAGE_CONFIG[3];
+  const engineRef = useRef<GameState | null>(null);
 
-  // Show toast helper
-  const showToast = useCallback(
-    (
-      message: string,
-      type: "success" | "error" | "warning" | "info" = "info",
-      position: "top" | "bottom" | "bottom-right" = "bottom-right"
-    ) => {
-      const id = toastIdCounter.current++;
-      setToasts((prev) => [...prev, { id, message, type, position }]);
-    },
-    []
-  );
-
-  // Remove toast
-  const removeToast = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
-
-  const handleAddPress = useCallback(() => {
-    if (usesLeft <= 0 || isAddingRows || gameEnd) return;
-
-    setIsAddingRows(true);
-
-    setTimeout(() => {
-      setGridRows((prev) => {
-        let toFill = nextAddCount;
-        let filledCount = prev.reduce(
-          (acc, row) => (row[0]?.value != null ? acc + 1 : acc),
-          0
-        );
-        const targetFilled = filledCount + toFill;
-        let newRows = [...prev];
-
-        while (newRows.length < targetFilled) {
-          const newRowIndex = newRows.length;
-          newRows.push(
-            Array.from({ length: GRID.INITIAL_COLS }).map((_, c) => ({
-              id: makeId(newRowIndex, c),
-              row: newRowIndex,
-              col: c,
-              value: null,
-              faded: false,
-            }))
-          );
-        }
-
-        for (let r = filledCount; r < targetFilled; r++) {
-          newRows[r] = generateRow(r, GRID.INITIAL_COLS);
-        }
-
-        return newRows;
-      });
-
-      setUsesLeft((u) => Math.max(0, u - 1));
-      setNextAddCount((n) => n * 2);
-      setIsAddingRows(false);
-    }, 150);
-  }, [usesLeft, nextAddCount, isAddingRows, gameEnd]);
-
-  const handleScore = useCallback(
-    (delta: number) => {
-      if (gameEnd) return;
-
-      setScore((s) => {
-        const newScore = s + delta;
-
-        // Add bonus time for matches if stage allows it
-        if (currentStageConfig.addsBonusTime && delta > 0) {
-          setSecondsLeft((prev) => prev + 3);
-        }
-
-        return newScore;
-      });
-    },
-    [currentStageConfig, gameEnd]
-  );
-
-  const handleGridUpdate = useCallback((updatedRows: CellData[][]) => {
-    setGridRows(updatedRows);
-  }, []);
-
-  const minutes = Math.floor(secondsLeft / 60)
-    .toString()
-    .padStart(2, "0");
-  const secs = (secondsLeft % 60).toString().padStart(2, "0");
-  const formattedTime = `${minutes}:${secs}`;
-
-  // Timer logic
+  // ------------------------------
+  // INIT ENGINE
+  // ------------------------------
   useEffect(() => {
-    if (gameEnd) {
-      // Clear timer when game ends
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-      return;
-    }
+    const engine = new GameState({
+      grid: {
+        rows: GRID.INITIAL_ROWS,
+        cols: GRID.INITIAL_COLS,
+        initialFilled: GRID.INITIAL_FILLED_ROWS,
+      },
+      levels: {
+        1: { target: 10, timeLimit: 30, bonusTime: 3, allowBonus: true },
+        2: { target: 20, timeLimit: 60, bonusTime: 3, allowBonus: true },
+        3: { target: 30, timeLimit: 180, bonusTime: 0, allowBonus: false },
+      },
+    });
 
-    timerRef.current = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (isAddingRows) return s;
-        const newTime = s - 1;
+    engineRef.current = engine;
+    setGrid(engine.grid.rows);
 
-        // Check if time is up
-        if (newTime <= 0) {
-          if (timerRef.current) {
-            clearInterval(timerRef.current);
-            timerRef.current = null;
-          }
-          setGameEnd(true);
-          setGameEndMessage("⏰ Time's Up! Game Over");
-          showToast("Time's up!", "error");
-          return 0;
-        }
-
-        // Show warning when time is running low
-        if (newTime <= 10 && !timeWarningShown.current) {
-          showToast("⚠️ Time is running out!", "warning");
-          timeWarningShown.current = true;
-        }
-
-        return newTime;
-      });
-    }, 1000);
+    engine.onGridChange = (g) => setGrid([...g]);
+    engine.onScore = (s) => setScore(s);
+    engine.onStageChange = (s) => setStage(s);
 
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
+      engineRef.current = null;
     };
-  }, [gameEnd, showToast]);
-
-  // Stage progression logic
-  useEffect(() => {
-    if (gameEnd) return;
-
-    // Check stage progression
-    // Stage 1: Need to reach 10 points
-    if (gameStage === 1 && score >= STAGE_CONFIG[1].targetScore) {
-      setGameStage(2);
-      setSecondsLeft(STAGE_CONFIG[2].timeLimit);
-      setUsesLeft((u) => u + 2);
-      showToast("🎉 Stage 1 Completed! Stage 2 Target 20", "success");
-      setScore(0);
-      timeWarningShown.current = false;
-    }
-    // Stage 2: Need to reach 20 points
-    else if (gameStage === 2 && score >= STAGE_CONFIG[2].targetScore) {
-      setGameStage(3);
-      setSecondsLeft(STAGE_CONFIG[3].timeLimit);
-      setUsesLeft((u) => u + 1);
-      showToast("🔥 Stage 2 Completed! Stage 3 Target 30", "success");
-      setScore(0);
-      timeWarningShown.current = false;
-    }
-    // Stage 3: Need to reach 30 points
-    else if (gameStage === 3 && score >= STAGE_CONFIG[3].targetScore) {
-      setGameEnd(true);
-      setGameEndMessage("🏆 Congratulations! You Won!");
-      // showToast("🏆 Victory!", "success");
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-  }, [score, gameStage, gameEnd, showToast]);
-
-  // restart function
-  const handlePressRestart = useCallback(() => {
-    // Clear timer
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
-    // Reset all states
-    setGameId((g) => g + 1);
-    setGameEnd(false);
-    setScore(0);
-    setGameStage(1);
-    setSecondsLeft(STAGE_CONFIG[1].timeLimit);
-    setNextAddCount(GRID.INITIAL_FILLED_ROWS);
-    setUsesLeft(GRID.ADD_BUTTON_USES);
-    setGridRows(
-      generateInitialGrid(
-        GRID.INITIAL_ROWS,
-        GRID.INITIAL_COLS,
-        GRID.INITIAL_FILLED_ROWS
-      )
-    ); // Generate NEW grid
-    setGameEndMessage("");
-    setIsAddingRows(false);
-    setToasts([]);
-    timeWarningShown.current = false;
   }, []);
 
+  // ------------------------------
+  // HANDLE CELL PRESS
+  // ------------------------------
+  const handleCellPress = useCallback(
+    async (cell: Cell) => {
+      if (gameEnd) return;
+
+      // First selection
+      if (selectedCells.length === 0) {
+        setSelectedCells([cell]);
+        return;
+      }
+
+      // Second selection: send to engine
+      if (selectedCells.length === 1) {
+        const a = selectedCells[0];
+        const b = cell;
+
+        if (a.row === b.row && a.col === b.col) {
+          setSelectedCells([]);
+          return;
+        }
+
+        const engine = engineRef.current;
+        if (!engine) return;
+
+        const result = engine.select(a, b);
+
+        // if (result.success) {
+        //   // Match happened
+        //   setSelectedCells([]);
+        // } else {
+        //   // INVALID MOVE → shake effect
+        //   setShakingCells([`${a.row}-${a.col}`, `${b.row}-${b.col}`]);
+        //   setTimeout(() => setShakingCells([]), 500);
+
+        //   setSelectedCells([]);
+        // }
+        if (result.success) {
+          setSelectedCells([]);
+        } else {
+          // Decide shake behavior:
+          // - To shake selected cells (recommended): use selected pair
+          // - To highlight/ shake interposing cells: use result.betweenCells
+          const shakeSelectedOnInvalid = false;
+
+          if (shakeSelectedOnInvalid) {
+            setShakingCells([`${a.row}-${a.col}`, `${b.row}-${b.col}`]);
+          } else {
+            setShakingCells(result.betweenCells ?? []);
+          }
+
+          // clear shake after short timeout
+          setTimeout(() => setShakingCells([]), 450);
+          setSelectedCells([]);
+        }
+      }
+    },
+    [selectedCells, gameEnd]
+  );
+
+  // ------------------------------
+  // ADD BUTTON
+  // ------------------------------
+  const handleAddRow = () => {
+    const engine = engineRef.current;
+    if (!engine || gameEnd) return;
+
+    engine.addRow();
+  };
+
+  // ------------------------------
+  // END GAME (stage 3 finish)
+  // ------------------------------
+  useEffect(() => {
+    if (stage === 4) {
+      setGameEnd(true);
+      setEndMessage("🎉 You Beat All Stages!");
+    }
+  }, [stage]);
+
+  // ------------------------------
+  // TOAST HELPERS
+  // ------------------------------
+  const showToast = (
+    message: string,
+    type: "success" | "error" | "warning" | "info" = "info"
+  ) => {
+    const id = toastIdRef.current++;
+    setToasts((prev) => [...prev, { id, message, type }]);
+  };
+
+  const removeToast = (id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // ------------------------------
+  // RENDER
+  // ------------------------------
   return (
     <View style={styles.container}>
       <GameBackground />
@@ -265,44 +180,39 @@ const MainGameScreen = ({ navigation }: Props) => {
         <>
           <View style={styles.topBar}>
             <GameCard
-              stage={gameStage}
+              stage={stage}
               score={score}
-              timer={formattedTime}
-              target={currentStageConfig.targetScore}
+              timer={"--:--"} // Timer now handled separately if needed
+              target={
+                stage === 1 ? 10 : stage === 2 ? 20 : stage === 3 ? 30 : 0
+              }
             />
           </View>
 
           <View style={styles.gridArea}>
             <ScrollView
-              overScrollMode="never"
-              bounces={false}
               contentContainerStyle={styles.gridContent}
               showsVerticalScrollIndicator={false}
+              overScrollMode="never"
             >
               <GameGrid
-                key={gameId}
-                rowsData={gridRows}
-                onScore={handleScore}
-                onGridUpdate={handleGridUpdate}
-                cols={GRID.INITIAL_COLS}
-                disabled={isAddingRows || gameEnd}
+                grid={grid}
+                selectedCells={selectedCells}
+                shakingCells={shakingCells}
+                onCellPress={handleCellPress}
               />
             </ScrollView>
           </View>
 
           <View style={styles.addButtonContainer}>
-            <GameAddButton
-              count={usesLeft}
-              onPress={handleAddPress}
-              disabled={usesLeft <= 0 || isAddingRows}
-            />
+            <GameAddButton count={2} disabled={false} onPress={handleAddRow} />
           </View>
         </>
       ) : (
         <GameEnd
-          message={gameEndMessage}
+          message={endMessage}
           score={score}
-          onPressRestart={handlePressRestart}
+          onPressRestart={() => navigation.replace("Game")}
           onPressHome={() =>
             navigation.reset({
               index: 0,
@@ -312,13 +222,11 @@ const MainGameScreen = ({ navigation }: Props) => {
         />
       )}
 
-      {/* Toast notifications */}
       {toasts.map((toast) => (
         <Toast
           key={toast.id}
           message={toast.message}
           type={toast.type}
-          position={toast.position}
           onHide={() => removeToast(toast.id)}
         />
       ))}
@@ -334,25 +242,23 @@ const styles = StyleSheet.create({
     position: "relative",
     width: "100%",
     height: "100%",
+    borderColor: "#ff0000ff",
+    borderWidth: 2,
   },
   topBar: {
     position: "absolute",
-    left: 0,
     top: 0,
     width: "100%",
     height: TOP_BAR_HEIGHT - 22,
-    zIndex: 10,
     justifyContent: "flex-end",
+    zIndex: 10,
   },
   gridArea: {
     position: "absolute",
-    left: 0,
-    right: 0,
     top: TOP_BAR_HEIGHT - 15,
     bottom: 0,
+    width: "100%",
     paddingHorizontal: PADDING_HORIZONTAL,
-    zIndex: 10,
-    height: "68%",
   },
   gridContent: {
     flexGrow: 1,
@@ -368,5 +274,7 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "16%",
     zIndex: 15,
+    borderColor: "#ddff00ff",
+    borderWidth: 2,
   },
 });
