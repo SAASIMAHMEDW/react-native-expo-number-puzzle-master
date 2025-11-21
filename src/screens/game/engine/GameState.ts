@@ -1,84 +1,373 @@
+import {
+  CellData,
+  GameStateData,
+  Position,
+  IEventEmitter,
+  GameEvent,
+  LevelConfig,
+} from "./types";
 import { GridEngine } from "./GridEngine";
 import { MatchEngine } from "./MatchEngine";
-import { LevelManager } from "./LevelManager";
-import { Cell, GridConfig, LevelConfig, SelectResult } from "./types";
-
-interface GameStateConfig {
-  grid: GridConfig;
-  levels: LevelConfig;
-}
+import { LevelManager, ScoreBasedProgressionStrategy } from "./LevelManager";
+import { EventEmitter } from "./EventEmitter";
+import { LEVEL_CONFIGS, LEVEL_SEQUENCE } from "./LevelConstants";
 
 export class GameState {
-  grid: GridEngine;
-  match: MatchEngine;
-  levels: LevelManager;
+  private eventEmitter: IEventEmitter;
+  private gridEngine!: GridEngine;
+  private matchEngine!: MatchEngine;
+  private levelManager: LevelManager;
 
-  onGridChange?: (g: Cell[][]) => void;
-  onScore?: (s: number) => void;
-  onStageChange?: (s: number) => void;
+  private score: number;
+  private timer: number;
+  private addRowUses: number;
+  private isGameOver: boolean;
+  private isPaused: boolean;
+  private selectedCell: Position | null;
+  private timerBoostCount: number;
+  private currentLevelTargetScore: number;
 
-  constructor(config: GameStateConfig) {
-    this.grid = new GridEngine(config.grid);
-    this.match = new MatchEngine();
-    this.levels = new LevelManager(config.levels);
+  constructor() {
+    this.eventEmitter = new EventEmitter();
+
+    this.levelManager = new LevelManager(
+      {
+        levels: LEVEL_CONFIGS,
+        sequence: LEVEL_SEQUENCE,
+        progressionStrategy: new ScoreBasedProgressionStrategy(
+          () => this.score,
+          () => this.timer
+        ),
+      },
+      this.eventEmitter
+    );
+
+    this.score = 0;
+    this.timer = 0;
+    this.addRowUses = 0;
+    this.isGameOver = false;
+    this.isPaused = false;
+    this.selectedCell = null;
+    this.timerBoostCount = 0;
+    this.currentLevelTargetScore = 0;
+
+    this.initializeLevel();
   }
 
-  select(a: Cell, b: Cell) {
-    const path = this.grid.checkPath(a, b);
-    const validPath = path.valid;
-    const validMatch = this.match.isValidMatch(a.value, b.value);
+  private initializeLevel(): void {
+    const level = this.levelManager.startLevel();
 
-    if (!validPath) {
-      return {
-        success: false,
-        reason: "path",
-        betweenCells: path.betweenCells,
-      };
-    }
-    if (!validMatch) {
-      return { success: false, reason: "match", betweenCells: [] };
-    }
+    this.gridEngine = new GridEngine(
+      level.initialRows,
+      level.initialCols,
+      level.initialFilledRows,
+      this.eventEmitter
+    );
 
-    this.grid.fadeCells(a, b);
-    this.levels.addScore(1);
+    this.matchEngine = new MatchEngine(this.gridEngine, this.eventEmitter);
 
-    this.onScore?.(this.levels.score);
-    this.onGridChange?.(this.grid.rows);
+    this.score = 0;
+    this.timer = level.initialTimer;
+    this.addRowUses = level.addRowCount;
+    this.isGameOver = false;
+    this.isPaused = false;
+    this.selectedCell = null;
+    this.timerBoostCount = 0;
+    this.currentLevelTargetScore = level.targetScore;
 
-    if (this.levels.shouldAdvance()) {
-      const newStage = this.levels.advance();
-      this.onStageChange?.(newStage);
-    }
-
-    return { success: true, updatedGrid: this.grid.rows };
+    this.eventEmitter.emit(GameEvent.GAME_STARTED, this.getStateSnapshot());
   }
 
-  selectOLD(a: Cell, b: Cell): SelectResult {
-    const validPath = this.grid.checkPath(a, b);
-    const validMatch = this.match.isValidMatch(a.value, b.value);
+  getEventEmitter(): IEventEmitter {
+    return this.eventEmitter;
+  }
 
-    if (!validPath) return { success: false, reason: "path" };
-    if (!validMatch) return { success: false, reason: "match" };
+  on(event: GameEvent, callback: (data?: any) => void): void {
+    this.eventEmitter.on(event, callback);
+  }
 
-    this.grid.fadeCells(a, b);
-    this.levels.addScore(1);
+  off(event: GameEvent, callback: (data?: any) => void): void {
+    this.eventEmitter.off(event, callback);
+  }
 
-    this.onScore?.(this.levels.score);
-    this.onGridChange?.(this.grid.rows);
+  getGrid(): CellData[][] {
+    return this.gridEngine.getGrid();
+  }
 
-    if (this.levels.shouldAdvance()) {
-      const newStage = this.levels.advance();
-      this.onStageChange?.(newStage);
-    }
+  getScore(): number {
+    return this.score;
+  }
 
+  getTimer(): number {
+    return this.timer;
+  }
+
+  getAddRowUses(): number {
+    return this.addRowUses;
+  }
+
+  isOver(): boolean {
+    return this.isGameOver;
+  }
+
+  getPaused(): boolean {
+    return this.isPaused;
+  }
+
+  getCurrentLevel(): LevelConfig {
+    return this.levelManager.getCurrentLevel();
+  }
+
+  getCurrentLevelNumber(): number {
+    return this.levelManager.getCurrentLevelNumber();
+  }
+
+  hasNextLevel(): boolean {
+    return this.levelManager.hasNextLevel();
+  }
+
+  getStateSnapshot(): GameStateData {
     return {
-      success: true,
-      updatedGrid: this.grid.rows,
+      currentLevel: this.levelManager.getCurrentLevelNumber(),
+      score: this.score,
+      timer: this.timer,
+      addRowUses: this.addRowUses,
+      isGameOver: this.isGameOver,
+      isPaused: this.isPaused,
+      grid: this.gridEngine.getGrid(),
+      currentLevelTargetScore: this.getCurrentLevelTargetScore(),
     };
   }
 
-  addRow() {
-    this.grid.addRow();
-    this.onGridChange?.(this.grid.rows);
+  // ✅ Updated to return match status and path info
+  selectCell(
+    row: number,
+    col: number
+  ): { success: boolean; invalidPath?: Position[] } {
+    if (this.isGameOver || this.isPaused) return { success: false };
+
+    const cell = this.gridEngine.getCell(row, col);
+    if (!cell || cell.value === null || cell.faded) return { success: false };
+
+    const position = { row, col };
+
+    // If same cell is clicked again, deselect it
+    if (
+      this.selectedCell &&
+      this.selectedCell.row === row &&
+      this.selectedCell.col === col
+    ) {
+      this.selectedCell = null;
+      this.eventEmitter.emit(GameEvent.CELL_SELECTED, {
+        position: null,
+        isFirst: false,
+      });
+      return { success: true };
+    }
+
+    if (!this.selectedCell) {
+      this.selectedCell = position;
+      this.eventEmitter.emit(GameEvent.CELL_SELECTED, {
+        position,
+        isFirst: true,
+      });
+      return { success: true };
+    }
+    // Second selection - attempt match
+
+    const matchResult = this.matchEngine.canMatch(this.selectedCell, position);
+
+    if (matchResult.isValid) {
+      // ✅ Store the first cell position
+      const firstCell = this.selectedCell;
+
+      // ✅ Set the second cell as selected (so both show glow)
+      this.selectedCell = position;
+      this.eventEmitter.emit(GameEvent.CELL_SELECTED, {
+        position,
+        isFirst: false,
+      });
+
+      // ✅ Wait 400ms to show both cells selected
+      setTimeout(() => {
+        // Execute the match
+        this.matchEngine.executeMatch(firstCell, position);
+        this.incrementScore();
+
+        // Clear selection
+        this.selectedCell = null;
+        this.eventEmitter.emit(GameEvent.CELL_SELECTED, {
+          position: null,
+          isFirst: false,
+        });
+
+        // Remove faded cells after animation
+        setTimeout(() => {
+          // this.gridEngine.removeFadedCells();
+          this.checkLevelProgression();
+        }, 300);
+      }, 400); // Delay to show selection
+
+      return { success: true };
+    } else {
+      // Return path for shake animation
+      const invalidPath = matchResult.path || [];
+      this.selectedCell = position;
+      this.eventEmitter.emit(GameEvent.CELL_SELECTED, {
+        position,
+        isFirst: true,
+      });
+      return { success: false, invalidPath };
+    }
+  }
+
+  clearSelection(): void {
+    this.selectedCell = null;
+  }
+
+  getSelectedCell(): Position | null {
+    return this.selectedCell;
+  }
+
+  getCurrentLevelTargetScore() {
+    return this.currentLevelTargetScore;
+  }
+
+  private incrementScore(): void {
+    this.score += 1;
+    this.eventEmitter.emit(GameEvent.SCORE_UPDATED, { score: this.score });
+
+    const level = this.getCurrentLevel();
+    if (
+      level.timerBoostPerScore > 0 &&
+      this.timerBoostCount < level.maxTimerBoosts
+    ) {
+      this.timer += level.timerBoostPerScore;
+      this.timerBoostCount++;
+      this.eventEmitter.emit(GameEvent.TIMER_UPDATED, { timer: this.timer });
+    }
+  }
+
+  decrementTimer(): void {
+    if (this.isGameOver || this.isPaused || this.timer <= 0) return;
+
+    this.timer -= 1;
+    this.eventEmitter.emit(GameEvent.TIMER_UPDATED, { timer: this.timer });
+
+    if (this.timer <= 0) {
+      this.eventEmitter.emit(GameEvent.TIMER_EXPIRED);
+      this.checkLevelProgression();
+    }
+  }
+
+  addRow(): boolean {
+    if (this.addRowUses <= 0) return false;
+
+    const success = this.gridEngine.addNewRow();
+    if (success) {
+      this.addRowUses -= 1;
+    }
+    return success;
+  }
+
+  private checkLevelProgression(): void {
+    const level = this.getCurrentLevel();
+    const progression = this.levelManager.evaluateProgression({
+      targetScore: level.targetScore,
+    });
+
+    if (progression === "level_up") {
+      this.handleLevelComplete();
+    } else if (progression === "level_fail") {
+      this.handleLevelFailed();
+    }
+  }
+
+  private handleLevelComplete(): void {
+    this.levelManager.completeLevel();
+  }
+
+  private handleLevelFailed(): void {
+    this.levelManager.failLevel();
+    this.endGame();
+  }
+
+  startNextLevel(): void {
+    if (!this.hasNextLevel()) {
+      this.endGame();
+      return;
+    }
+
+    const nextLevel = this.levelManager.advanceToNextLevel();
+    if (nextLevel) {
+      this.gridEngine = new GridEngine(
+        nextLevel.initialRows,
+        nextLevel.initialCols,
+        nextLevel.initialFilledRows,
+        this.eventEmitter
+      );
+      this.matchEngine = new MatchEngine(this.gridEngine, this.eventEmitter);
+
+      this.score = 0;
+      this.timer = nextLevel.initialTimer;
+      this.addRowUses = nextLevel.addRowCount;
+      this.selectedCell = null;
+      this.timerBoostCount = 0;
+      this.isPaused = false;
+
+      this.eventEmitter.emit(GameEvent.GAME_STARTED, this.getStateSnapshot());
+    }
+  }
+
+  restartLevel(): void {
+    const level = this.levelManager.restartCurrentLevel();
+
+    this.gridEngine = new GridEngine(
+      level.initialRows,
+      level.initialCols,
+      level.initialFilledRows,
+      this.eventEmitter
+    );
+    this.matchEngine = new MatchEngine(this.gridEngine, this.eventEmitter);
+
+    this.score = 0;
+    this.timer = level.initialTimer;
+    this.addRowUses = level.addRowCount;
+    this.isGameOver = false;
+    this.isPaused = false;
+    this.selectedCell = null;
+    this.timerBoostCount = 0;
+    this.currentLevelTargetScore = level.targetScore;
+
+    this.eventEmitter.emit(GameEvent.GAME_STARTED, this.getStateSnapshot());
+  }
+
+  pause(): void {
+    if (!this.isGameOver) {
+      this.isPaused = true;
+      this.eventEmitter.emit(GameEvent.GAME_PAUSED);
+    }
+  }
+
+  resume(): void {
+    if (!this.isGameOver) {
+      this.isPaused = false;
+      this.eventEmitter.emit(GameEvent.GAME_RESUMED);
+    }
+  }
+
+  private endGame(): void {
+    this.isGameOver = true;
+    this.eventEmitter.emit(GameEvent.GAME_OVER, {
+      finalScore: this.score,
+      level: this.getCurrentLevelNumber(),
+      allLevelsComplete:
+        !this.hasNextLevel() &&
+        this.score >= this.getCurrentLevel().targetScore,
+    });
+  }
+
+  destroy(): void {
+    this.eventEmitter.removeAllListeners();
   }
 }

@@ -59,8 +59,6 @@ const styles = StyleSheet.create({
     width: "auto",
     height: "auto",
     position: "relative",
-    borderColor: "#0080ffff",
-    borderWidth: 2,
   },
   plusWrapper: {
     justifyContent: "center",

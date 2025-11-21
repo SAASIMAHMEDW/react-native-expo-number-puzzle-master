@@ -8,8 +8,8 @@ const { height, width } = Dimensions.get("window");
 interface GameCardProps {
   stage: number;
   score: number;
-  timer: string;
-  target: number;
+  timer: number;
+  target?: number;
 }
 
 const labelFontSize = width * 0.035;
@@ -20,10 +20,19 @@ const GameCard: React.FC<GameCardProps> = ({ stage, score, timer, target }) => {
   const [fontsLoaded, fontError] = useFonts({
     "MomoTrustDisplay-Regular": require("@assets/fonts/MomoTrustDisplay-Regular.ttf"),
   });
-  if (!fontsLoaded || fontError) return null;
 
-  const [minutes, seconds] = timer?.split(":").map(Number) || [0, 0];
-  const timerTextColor = seconds <= 10 ? "#ff0909ba" : "#fff";
+  if (!fontsLoaded || fontError) {
+    return null;
+  }
+
+  // Format timer from number to MM:SS
+  const minutes = Math.floor(timer / 60);
+  const seconds = timer % 60;
+  const formattedMinutes = minutes.toString().padStart(2, "0");
+  const formattedSeconds = seconds.toString().padStart(2, "0");
+  const formattedTime = `${formattedMinutes}:${formattedSeconds}`;
+
+  const timerTextColor = seconds <= 10 && minutes === 0 ? "#ff0909ba" : "#fff";
 
   return (
     <View style={styles.container}>
@@ -34,26 +43,21 @@ const GameCard: React.FC<GameCardProps> = ({ stage, score, timer, target }) => {
           <Text style={styles.value}>{stage}</Text>
         </View>
 
-        {/* Center: Target + Score */}
+        {/* Center: Score */}
         <View style={styles.centerContainer}>
-          <Text style={styles.targetLabel}>
-            Target: <Text style={styles.targetValue}>{target}</Text>
-          </Text>
+          {target && (
+            <Text style={styles.targetLabel}>
+              Target: <Text style={styles.targetValue}>{target}</Text>
+            </Text>
+          )}
           <Text style={styles.scoreText}>{score}</Text>
         </View>
 
         {/* Right: Timer */}
         <View style={styles.sideContainerRight}>
           <Text style={styles.label}>Timer</Text>
-          <Text
-            style={[
-              styles.value,
-              {
-                color: timerTextColor,
-              },
-            ]}
-          >
-            {timer}
+          <Text style={[styles.value, { color: timerTextColor }]}>
+            {formattedTime}
           </Text>
         </View>
       </View>
@@ -84,10 +88,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     paddingTop: 40,
     zIndex: 20,
-    borderColor: "#1eff00ff",
-    borderWidth: 2,
+    overflow: "hidden",
   },
-
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -95,7 +97,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flex: 1,
   },
-
   sideContainer: {
     width: width * 0.25,
     alignItems: "flex-start",
@@ -104,7 +105,6 @@ const styles = StyleSheet.create({
     width: width * 0.25,
     alignItems: "flex-end",
   },
-
   label: {
     color: "#fff",
     fontSize: labelFontSize,
@@ -116,7 +116,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginTop: 2,
   },
-
   centerContainer: {
     position: "absolute",
     alignSelf: "center",
@@ -151,7 +150,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 12,
   },
-
   bottomBorder: {
     height: 2,
     width: "100%",

@@ -1,63 +1,68 @@
-import React, { useEffect } from "react";
-import { Text, StyleSheet, Pressable } from "react-native";
+import React, { useEffect, memo } from "react";
+import { StyleSheet, Text, Pressable, View } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withTiming,
+  withSpring,
   withSequence,
+  withTiming,
+  withRepeat,
   Easing,
   interpolate,
 } from "react-native-reanimated";
+import { CELL_NUMBER_COLORS } from "../constants";
 
 interface GameCellProps {
-  value: number;
-  row: number;
-  col: number;
-  fontSize?: number;
-  isSelected: boolean;
-  isFaded: boolean;
-  isShaking?: boolean;
-  onPress: (row: number, col: number, value: number) => void;
+  value: number | null;
+  color?: string;
+  faded: boolean;
+  selected: boolean;
+  onPress: () => void;
+  size: number;
+  shouldShake?: boolean;
 }
-
-const CELL_NUMBER_COLORS = [
-  "#FF6F61",
-  "#FFB400",
-  "#6BCB77",
-  "#4D96FF",
-  "#C77DFF",
-  "#FF4B91",
-  "#FFD93D",
-  "#00C2A8",
-  "#FF8B13",
-];
 
 const GameCell: React.FC<GameCellProps> = ({
   value,
-  fontSize = 36,
+  color = "#00FFF0",
+  faded,
+  selected,
   onPress,
-  row,
-  col,
-  isSelected,
-  isFaded,
-  isShaking = false,
+  size,
+  shouldShake = false,
 }) => {
-  const scale = useSharedValue(value != null ? 0 : 0.6);
-  const opacity = useSharedValue(value != null ? 0 : 0);
-  const rotation = useSharedValue(0);
+  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const glowIntensity = useSharedValue(0);
+  const bgOpacity = useSharedValue(0);
   const borderOpacity = useSharedValue(0);
+
+  // Selection animation - glow effect
+  useEffect(() => {
+    if (selected) {
+      scale.value = withSpring(1.03, {
+        damping: 10,
+        stiffness: 150,
+      });
+      glowIntensity.value = withSpring(1);
+    } else {
+      scale.value = withSpring(1);
+      glowIntensity.value = withSpring(0);
+    }
+  }, [selected]);
 
   // Smooth glow for selected cells
   useEffect(() => {
-    borderOpacity.value = withTiming(isSelected ? 1 : 0, {
+    borderOpacity.value = withTiming(selected ? 1 : 0, {
       duration: 200,
       easing: Easing.out(Easing.cubic),
     });
-  }, [isSelected]);
+  }, [selected]);
 
   // Number pop-in animation
   useEffect(() => {
-    if (value != null && !isFaded) {
+    if (value != null && !faded) {
       opacity.value = withSequence(
         withTiming(0, { duration: 0 }),
         withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) })
@@ -68,35 +73,64 @@ const GameCell: React.FC<GameCellProps> = ({
         withTiming(1, { duration: 150, easing: Easing.inOut(Easing.cubic) })
       );
     }
-  }, [value, isFaded]);
+  }, [value, faded]);
 
-  // Faded cells (after match)
+  // Fade animation
   useEffect(() => {
-    if (isFaded) {
-      opacity.value = withTiming(0.15, { duration: 300 }); // fade to 30% opacity
+    if (faded) {
+      opacity.value = withTiming(0.1, { duration: 300 });
       scale.value = withTiming(1, { duration: 300 }); // no shrink
     } else {
-      opacity.value = withTiming(1, { duration: 300 }); // restore when not faded
+      opacity.value = withTiming(1, { duration: 300 });
     }
-  }, [isFaded]);
+  }, [faded]);
 
-  // Shake animation for invalid move
+  // Shake animation for invalid moves
+  // useEffect(() => {
+  //   if (shouldShake) {
+  //     translateX.value = withSequence(
+  //       withTiming(-6, { duration: 50 }),
+  //       withRepeat(withTiming(6, { duration: 50 }), 5, true),
+  //       withTiming(0, { duration: 50 })
+  //     );
+
+  //     bgOpacity.value = withSequence(
+  //       withTiming(0.8, { duration: 100 }),
+  //       withTiming(0, { duration: 500 })
+  //     );
+  //   }
+  // }, [shouldShake]);
+
   useEffect(() => {
-    if (isShaking) {
-      rotation.value = withSequence(
+    if (shouldShake) {
+      // Shake animation
+      translateX.value = withSequence(
         withTiming(6, { duration: 60 }),
         withTiming(-6, { duration: 60 }),
         withTiming(4, { duration: 60 }),
         withTiming(-4, { duration: 60 }),
         withTiming(0, { duration: 50 })
       );
+      // ADD THIS: Red background flash
+      bgOpacity.value = withSequence(
+        withTiming(1, { duration: 100 }),
+        withTiming(0, { duration: 400 })
+      );
     }
-  }, [isShaking]);
+  }, [shouldShake]);
 
-  const color =
-    value != null
-      ? CELL_NUMBER_COLORS[(value - 1) % CELL_NUMBER_COLORS.length]
-      : "#fff";
+  const animatedCellStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }, { translateX: translateX.value }],
+    opacity: opacity.value,
+  }));
+
+  const animatedGlowStyle = useAnimatedStyle(() => ({
+    opacity: glowIntensity.value,
+  }));
+
+  const animatedShakeStyle = useAnimatedStyle(() => ({
+    opacity: bgOpacity.value,
+  }));
 
   // --- BORDER + GLOW STYLE ---
   const cellContainerStyle = useAnimatedStyle(() => {
@@ -105,7 +139,7 @@ const GameCell: React.FC<GameCellProps> = ({
       borderWidth: interpolate(borderOpacity.value, [0, 1], [0, 2]),
       borderColor: borderColor,
       borderRadius: 4,
-      backgroundColor: isSelected ? `${borderColor}22` : "transparent",
+      backgroundColor: selected ? `${borderColor}22` : "transparent",
       shadowColor: borderColor,
       shadowOpacity: interpolate(borderOpacity.value, [0, 1], [0, 0.5]),
       shadowRadius: interpolate(borderOpacity.value, [0, 1], [0, 8]),
@@ -115,48 +149,83 @@ const GameCell: React.FC<GameCellProps> = ({
 
   // --- SHAKE (invalid) STYLE ---
   const shakingBgStyle = useAnimatedStyle(() => ({
-    backgroundColor: isShaking ? "rgba(255, 60, 60, 0.25)" : "transparent",
-    borderColor: isShaking ? "rgba(255, 60, 60, 0.8)" : "transparent",
-    borderWidth: isShaking ? 2 : 0,
-    transform: [{ scale: isShaking ? 1.05 : 1 }],
+    backgroundColor: shouldShake ? "rgba(255, 60, 60, 0.25)" : "transparent",
+    borderColor: shouldShake ? "rgba(255, 60, 60, 0.8)" : "transparent",
+    borderWidth: shouldShake ? 2 : 0,
+    transform: [{ scale: shouldShake ? 1.05 : 1 }],
   }));
 
   // --- NUMBER ANIMATION STYLE ---
   const numberStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }, { scale: scale.value }],
+    transform: [{ rotate: `${translateX.value}deg` }, { scale: scale.value }],
     opacity: opacity.value,
   }));
 
-  return (
-    <Pressable
-      onPress={() => !isFaded && onPress(row, col, value)}
-      disabled={isFaded}
-      style={{ flex: 1, width: "100%" }}
-    >
-      <Animated.View style={[styles.cellWrapper, cellContainerStyle]}>
-        {/* Red flash background for invalid move */}
-        <Animated.View
-          style={[StyleSheet.absoluteFill, shakingBgStyle, { borderRadius: 4 }]}
-        />
+  if (value === null) {
+    return <View style={[styles.emptyCell, { width: size, height: size }]} />;
+  }
 
-        {/* Number */}
-        {value != null && (
-          <Animated.View style={[styles.numberContainer, numberStyle]}>
-            <Text
-              style={[
-                styles.text,
-                {
-                  fontSize,
-                  color: isSelected ? "#FFFFFF" : color,
-                },
-              ]}
-            >
-              {value}
-            </Text>
-          </Animated.View>
-        )}
-      </Animated.View>
-    </Pressable>
+  return (
+    <Animated.View
+      style={[styles.cellWrapper, animatedCellStyle, cellContainerStyle]}
+    >
+      {/* Outer Glow for selected tile */}
+      {selected && (
+        <Animated.View
+          style={[
+            styles.glowOuter,
+            {
+              width: size + 8,
+              height: size + 8,
+              backgroundColor: `${color + "22"}`,
+              shadowColor: color,
+            },
+            animatedGlowStyle,
+          ]}
+        />
+      )}
+
+      {/* Red flash for shake */}
+      <Animated.View
+        style={[
+          styles.shakeBg,
+          {
+            width: size,
+            height: size,
+          },
+          animatedShakeStyle,
+          shakingBgStyle,
+        ]}
+      />
+
+      <Pressable
+        onPress={onPress}
+        disabled={faded}
+        style={({ pressed }) => [
+          styles.cell,
+          {
+            width: size,
+            height: size,
+            // backgroundColor: color,
+            opacity: pressed ? 0.85 : 1,
+          },
+        ]}
+      >
+        <Text
+          style={[
+            styles.text,
+            {
+              fontSize: size * 0.7,
+              color: selected ? "#FFFFFF" : color, // ✅ White when selected, color when not
+              textShadowColor: selected ? "rgba(0, 0, 0, 0.8)" : "transparent",
+            },
+            numberStyle,
+          ]}
+        >
+          {value}
+        </Text>
+      </Pressable>
+    </Animated.View>
   );
 };
 
@@ -169,9 +238,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 4,
-    overflow: "visible", 
-    borderColor: "#ff00d9ff",
-    borderWidth: 2,
+    overflow: "visible", // allow glow to extend outside cell
+  },
+  emptyCell: {
+    backgroundColor: "transparent",
+  },
+  glowOuter: {
+    position: "absolute",
+    borderRadius: 10,
+    opacity: 0.6,
+    shadowOpacity: 1,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 20,
   },
   numberContainer: {
     justifyContent: "center",
@@ -179,10 +258,25 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  cell: {
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    // shadowColor: "#000",
+    // shadowOffset: { width: 0, height: 3 },
+    // shadowOpacity: 0.4,
+    // shadowRadius: 4,
+    elevation: 5,
+  },
   text: {
-    fontWeight: "800",
-    fontFamily: "MomoTrustDisplay-Regular",
+    fontWeight: "900",
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  shakeBg: {
+    position: "absolute",
+    backgroundColor: "#ff000075",
+    borderRadius: 8,
+    zIndex: -1,
   },
 });
-
-

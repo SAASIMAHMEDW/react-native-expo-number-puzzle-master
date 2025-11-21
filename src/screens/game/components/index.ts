@@ -1,19 +1,9 @@
-import GameBackground from "./GameBackground";
-import GameStars from "./GameStars";
-import GameCard from "./GameCard";
-import GameAddButton from "./GameAddButton";
-
-import GameGrid from "./GameGrid";
-
-import GameGoBack from "./GameGoBack";
-import GameEnd from "./GameEnd";
-
-export {
-  GameBackground,
-  GameStars,
-  GameCard,
-  GameAddButton,
-  GameGrid,
-  GameGoBack,
-  GameEnd,
-};
+export { default as GameBackground } from "./GameBackground";
+export { default as GameStars } from "./GameStars";
+export { default as GameCard } from "./GameCard";
+export { default as GameGrid } from "./GameGrid";
+export { default as GameCell } from "./GameCell";
+export { default as GameAddButton } from "./GameAddButton";
+export { default as GameGoBack } from "./GameGoBack";
+export { default as GameEnd } from "./GameEnd";
+export { default as GameLevelTransition } from "./GameLevelTransition";

@@ -1,265 +1,266 @@
-import { Cell, GridConfig } from "./types";
+import { CellData, Position, IEventEmitter, GameEvent } from "./types";
+import { EventEmitter } from "./EventEmitter";
+import { getRandomNeonColor } from "../constants/NEON_COLORS"; // ✅ Import
 
 export class GridEngine {
-  rows: Cell[][];
-  cols: number;
-  config: GridConfig;
+  private grid: CellData[][];
+  private rows: number;
+  private cols: number;
+  private eventEmitter: IEventEmitter;
+  private lastAddedRowCount: number;
 
-  constructor(config: GridConfig) {
-    this.config = config;
-    this.cols = config.cols;
-
-    this.rows = this.generateInitialGrid(
-      config.rows,
-      config.cols,
-      config.initialFilled
-    );
+  constructor(
+    rows: number,
+    cols: number,
+    filledRows: number,
+    eventEmitter?: IEventEmitter
+  ) {
+    this.rows = rows;
+    this.cols = cols;
+    this.eventEmitter = eventEmitter || new EventEmitter();
+    this.lastAddedRowCount = filledRows;
+    this.grid = this.generateInitialGrid(filledRows);
   }
 
-  private generateInitialGrid(totalRows: number, cols: number, filled: number) {
-    const grid: Cell[][] = [];
-
-    for (let r = 0; r < totalRows; r++) {
-      const isFilled = r < filled;
-
-      grid.push(
-        Array.from({ length: cols }).map((_, c) => ({
-          id: `${r}-${c}-${Math.random().toString(36).slice(2, 6)}`,
-          row: r,
-          col: c,
-          value: isFilled ? Math.ceil(Math.random() * 9) : null,
-          faded: false,
-        }))
-      );
-    }
-
-    return grid;
+  private makeId(r: number, c: number): string {
+    return `${r}-${c}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
-  getCell(r: number, c: number) {
-    return this.rows[r]?.[c] ?? null;
-  }
-
-  fadeCells(a: Cell, b: Cell) {
-    this.rows[a.row][a.col].faded = true;
-    this.rows[b.row][b.col].faded = true;
-  }
-
-  /** -------------------------------------------
-   *  PATH CHECKING LOGIC (migrated from GameGrid)
-   *  ------------------------------------------- */
-  checkPath(a: Cell, b: Cell): { valid: boolean; betweenCells: string[] } {
-    const r1 = a.row;
-    const c1 = a.col;
-    const r2 = b.row;
-    const c2 = b.col;
-
-    const betweenFn = (r: number, c: number) => {
-      const cell = this.rows[r][c];
-      return !(cell.faded || cell.value === null);
-    };
-
-    const betweenCells: string[] = [];
-
-    // Horizontal
-    if (r1 === r2) {
-      const minC = Math.min(c1, c2);
-      const maxC = Math.max(c1, c2);
-      for (let c = minC + 1; c < maxC; c++) {
-        if (betweenFn(r1, c)) betweenCells.push(`${r1}-${c}`);
-      }
-      return { valid: betweenCells.length === 0, betweenCells };
-    }
-
-    // Vertical
-    if (c1 === c2) {
-      const minR = Math.min(r1, r2);
-      const maxR = Math.max(r1, r2);
-      for (let r = minR + 1; r < maxR; r++) {
-        if (betweenFn(r, c1)) betweenCells.push(`${r}-${c1}`);
-      }
-      return { valid: betweenCells.length === 0, betweenCells };
-    }
-
-    // Diagonal
-    const rowDiff = r2 - r1;
-    const colDiff = c2 - c1;
-    if (Math.abs(rowDiff) === Math.abs(colDiff)) {
-      const steps = Math.abs(rowDiff);
-      const rStep = rowDiff / steps;
-      const cStep = colDiff / steps;
-      for (let i = 1; i < steps; i++) {
-        const r = r1 + rStep * i;
-        const c = c1 + cStep * i;
-        if (betweenFn(r, c)) betweenCells.push(`${r}-${c}`);
-      }
-      return { valid: betweenCells.length === 0, betweenCells };
-    }
-
-    // Wrap-around (linear sequence) check
-    const totalCells = this.rows.length * this.cols;
-    const indexOf = (r: number, c: number) => r * this.cols + c;
-    const i1 = indexOf(r1, c1);
-    const i2 = indexOf(r2, c2);
-    let start = Math.min(i1, i2);
-    let end = Math.max(i1, i2);
-
-    // direct path
-    for (let i = start + 1; i < end; i++) {
-      const rr = Math.floor(i / this.cols);
-      const cc = i % this.cols;
-      if (betweenFn(rr, cc)) betweenCells.push(`${rr}-${cc}`);
-    }
-
-    if (betweenCells.length === 0) return { valid: true, betweenCells: [] };
-
-    // try wrap path (end -> start)
-    const wrapped: string[] = [];
-    for (let i = end + 1; i < totalCells + start; i++) {
-      const idx = i % totalCells;
-      const rr = Math.floor(idx / this.cols);
-      const cc = idx % this.cols;
-      if (betweenFn(rr, cc)) wrapped.push(`${rr}-${cc}`);
-    }
-
-    if (wrapped.length === 0) {
-      return { valid: true, betweenCells: [] }; // wrap path is clear
-    }
-
-    // blocks exist => invalid
-    return { valid: false, betweenCells };
-  }
-
-  checkPathOLD(a: Cell, b: Cell): boolean {
-    const r1 = a.row;
-    const c1 = a.col;
-    const r2 = b.row;
-    const c2 = b.col;
-
-    const between = (r: number, c: number) => {
-      const cell = this.rows[r][c];
-      return !(cell.faded || cell.value === null);
-    };
-
-    // ---- Horizontal ---- //
-    if (r1 === r2) {
-      const minC = Math.min(c1, c2);
-      const maxC = Math.max(c1, c2);
-
-      for (let c = minC + 1; c < maxC; c++) {
-        if (between(r1, c)) return false;
-      }
-      return true;
-    }
-
-    // ---- Vertical ---- //
-    if (c1 === c2) {
-      const minR = Math.min(r1, r2);
-      const maxR = Math.max(r1, r2);
-
-      for (let r = minR + 1; r < maxR; r++) {
-        if (between(r, c1)) return false;
-      }
-      return true;
-    }
-
-    // ---- Diagonal ---- //
-    const rowDiff = r2 - r1;
-    const colDiff = c2 - c1;
-
-    if (Math.abs(rowDiff) === Math.abs(colDiff)) {
-      const steps = Math.abs(rowDiff);
-      const rStep = rowDiff / steps;
-      const cStep = colDiff / steps;
-
-      for (let i = 1; i < steps; i++) {
-        const r = r1 + rStep * i;
-        const c = c1 + cStep * i;
-        if (between(r, c)) return false;
-      }
-      return true;
-    }
-
-    // -----------------------------------------------------------
-    // WRAP-AROUND CHECK (linear wrap across entire grid sequence)
-    // -----------------------------------------------------------
-    const totalCells = this.rows.length * this.cols;
-
-    const indexOf = (r: number, c: number) => r * this.cols + c;
-
-    const i1 = indexOf(r1, c1);
-    const i2 = indexOf(r2, c2);
-
-    let [start, end] = i1 < i2 ? [i1, i2] : [i2, i1];
-
-    // Check direct path (start → end)
-    for (let i = start + 1; i < end; i++) {
-      const r = Math.floor(i / this.cols);
-      const c = i % this.cols;
-      if (between(r, c)) return false;
-    }
-
-    // Check WRAP path (end → start by wrapping)
-    for (let i = end + 1; i < totalCells + start; i++) {
-      const idx = i % totalCells;
-      const r = Math.floor(idx / this.cols);
-      const c = idx % this.cols;
-      if (between(r, c)) return false;
-    }
-
-    return true;
-  }
-
-  /** ------------------------
-   *  ADD ROW (same behavior)
-   *  ------------------------ */
-  addRowOLD() {
-    const newIndex = this.rows.length;
-
-    const newRow = Array.from({ length: this.cols }).map((_, c) => ({
-      id: `${newIndex}-${c}-${Math.random().toString(36).slice(2, 6)}`,
-      row: newIndex,
+  private generateRowOLDY(rowIndex: number): CellData[] {
+    return Array.from({ length: this.cols }).map((_, c) => ({
+      id: this.makeId(rowIndex, c),
+      row: rowIndex,
       col: c,
       value: Math.ceil(Math.random() * 9),
       faded: false,
+      color: getRandomNeonColor(), // ✅ Assign random neon color
     }));
-
-    this.rows.push(newRow);
-    return this.rows;
   }
-
-  addRow() {
-    const newRow = Array.from({ length: this.cols }).map((_, c) => ({
-      id: `${this.rows.length}-${c}-${Math.random().toString(36).slice(2, 6)}`,
-      row: this.rows.length,
+  private generateRow(rowIndex: number): CellData[] {
+    return Array.from({ length: this.cols }).map((_, c) => ({
+      id: this.makeId(rowIndex, c),
+      row: rowIndex, // Uses the actual row index passed in
       col: c,
       value: Math.ceil(Math.random() * 9),
       faded: false,
+      color: getRandomNeonColor(),
     }));
-    this.rows.push(newRow);
-    this.reindex(); // ensure consistent row/col after mutation
-    return this.rows;
   }
 
-  reindex() {
-    for (let r = 0; r < this.rows.length; r++) {
-      for (let c = 0; c < this.cols; c++) {
-        const cell = this.rows[r][c];
-        if (cell) {
-          cell.row = r;
-          cell.col = c;
-          cell.id = `${r}-${c}-${cell.id.split("-").pop()}`;
-        } else {
-          // if missing, create placeholder to keep shape
-          this.rows[r][c] = {
-            id: `${r}-${c}-${Math.random().toString(36).slice(2, 6)}`,
+  private generateInitialGrid(filledRows: number): CellData[][] {
+    const rows: CellData[][] = [];
+    for (let r = 0; r < this.rows; r++) {
+      if (r < filledRows) {
+        rows.push(this.generateRow(r));
+      } else {
+        rows.push(
+          Array.from({ length: this.cols }).map((_, c) => ({
+            id: this.makeId(r, c),
             row: r,
             col: c,
             value: null,
             faded: false,
-          };
+            color: undefined,
+          }))
+        );
+      }
+    }
+    return rows;
+  }
+
+  getGrid(): CellData[][] {
+    return this.grid;
+  }
+
+  getCell(row: number, col: number): CellData | null {
+    if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
+      return this.grid[row][col];
+    }
+    return null;
+  }
+
+  getCellValue(row: number, col: number): number | null {
+    const cell = this.getCell(row, col);
+    return cell ? cell.value : null;
+  }
+
+  updateCellOLDY(row: number, col: number, updates: Partial<CellData>): void {
+    if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
+      this.grid[row][col] = { ...this.grid[row][col], ...updates };
+      this.eventEmitter.emit(GameEvent.GRID_UPDATED, this.grid);
+    }
+  }
+  // Only emit when necessary
+  updateCell(
+    row: number,
+    col: number,
+    updates: Partial<CellData>,
+    skipEmit = false
+  ): void {
+    if (row >= 0 && row < this.rows && col >= 0 && col < this.cols) {
+      this.grid[row][col] = { ...this.grid[row][col], ...updates };
+      if (!skipEmit) {
+        this.eventEmitter.emit(GameEvent.GRID_UPDATED, this.grid);
+      }
+    }
+  }
+
+  fadeCellsOLDY(positions: Position[]): void {
+    positions.forEach(({ row, col }) => {
+      this.updateCell(row, col, { faded: true });
+    });
+  }
+  // Batch multiple cell updates
+  fadeCells(positions: Position[]): void {
+    positions.forEach(({ row, col }, index) => {
+      const skipEmit = index < positions.length - 1;
+      this.updateCell(row, col, { faded: true }, skipEmit);
+    });
+  }
+
+  removeFadedCells(): void {
+    // for (let row = 0; row < this.rows; row++) {
+    //   for (let col = 0; col < this.cols; col++) {
+    //     if (this.grid[row][col].faded) {
+    //       this.grid[row][col].value = null;
+    //       this.grid[row][col].faded = false;
+    //       this.grid[row][col].color = undefined;
+    //     }
+    //   }
+    // }
+    this.eventEmitter.emit(GameEvent.GRID_UPDATED, this.grid);
+  }
+
+  addNewRowOLDY(): boolean {
+    const emptyRows: number[] = [];
+    for (let r = 0; r < this.rows; r++) {
+      if (this.grid[r].every((cell) => cell.value === null)) {
+        emptyRows.push(r);
+      }
+    }
+
+    if (emptyRows.length === 0) {
+      return false;
+    }
+
+    const rowsToAdd = Math.min(this.lastAddedRowCount, emptyRows.length);
+
+    if (rowsToAdd === 0) {
+      return false;
+    }
+
+    for (let i = 0; i < rowsToAdd; i++) {
+      if (i < emptyRows.length) {
+        const rowIndex = emptyRows[i];
+        this.grid[rowIndex] = this.generateRow(rowIndex);
+      }
+    }
+
+    this.lastAddedRowCount = rowsToAdd * 2;
+
+    this.eventEmitter.emit(GameEvent.ROW_ADDED, { rowsAdded: rowsToAdd });
+    this.eventEmitter.emit(GameEvent.GRID_UPDATED, this.grid);
+    return true;
+  }
+  addNewRow(): boolean {
+    // Find empty rows
+    const emptyRows: number[] = [];
+    for (let r = 0; r < this.rows; r++) {
+      if (this.grid[r].every((cell) => cell.value === null)) {
+        emptyRows.push(r);
+      }
+    }
+
+    // ✅ NEW: If no empty rows, expand the grid!
+    if (emptyRows.length === 0) {
+      const rowsToCreate = this.lastAddedRowCount;
+      const startRow = this.rows; // Start from current end
+
+      // Create new rows
+      for (let i = 0; i < rowsToCreate; i++) {
+        const newRowIndex = startRow + i;
+        this.grid.push(this.generateRow(newRowIndex));
+        this.rows++; // Increase row count
+      }
+
+      // Double for next time
+      this.lastAddedRowCount = rowsToCreate * 2;
+
+      this.eventEmitter.emit(GameEvent.ROW_ADDED, {
+        rowsAdded: rowsToCreate,
+        firstNewRowIndex: startRow,
+      });
+      this.eventEmitter.emit(GameEvent.GRID_UPDATED, this.grid);
+      return true;
+    }
+
+    // ✅ Fill existing empty rows
+    const rowsToAdd = Math.min(this.lastAddedRowCount, emptyRows.length);
+
+    if (rowsToAdd === 0) {
+      return false;
+    }
+
+    for (let i = 0; i < rowsToAdd; i++) {
+      if (i < emptyRows.length) {
+        const rowIndex = emptyRows[i];
+        this.grid[rowIndex] = this.generateRow(rowIndex);
+      }
+    }
+
+    // Only double if we filled all requested rows
+    if (rowsToAdd === this.lastAddedRowCount) {
+      this.lastAddedRowCount = rowsToAdd * 2;
+    }
+
+    this.eventEmitter.emit(GameEvent.ROW_ADDED, {
+      rowsAdded: rowsToAdd,
+      firstNewRowIndex: emptyRows[0],
+    });
+    this.eventEmitter.emit(GameEvent.GRID_UPDATED, this.grid);
+    return true;
+  }
+
+  hasAvailableMoves(): boolean {
+    for (let row = 0; row < this.rows; row++) {
+      for (let col = 0; col < this.cols; col++) {
+        const cell = this.grid[row][col];
+        if (cell.value !== null && !cell.faded) {
+          const neighbors = this.getNeighbors(row, col);
+          for (const neighbor of neighbors) {
+            const neighborCell = this.getCell(neighbor.row, neighbor.col);
+            if (
+              neighborCell &&
+              neighborCell.value !== null &&
+              !neighborCell.faded
+            ) {
+              return true;
+            }
+          }
         }
       }
     }
+    return false;
+  }
+
+  private getNeighbors(row: number, col: number): Position[] {
+    return [
+      { row: row - 1, col },
+      { row: row + 1, col },
+      { row, col: col - 1 },
+      { row, col: col + 1 },
+    ].filter(
+      (pos) =>
+        pos.row >= 0 &&
+        pos.row < this.rows &&
+        pos.col >= 0 &&
+        pos.col < this.cols
+    );
+  }
+
+  reset(filledRows: number): void {
+    this.lastAddedRowCount = filledRows;
+    this.grid = this.generateInitialGrid(filledRows);
+    this.eventEmitter.emit(GameEvent.GRID_UPDATED, this.grid);
   }
 }

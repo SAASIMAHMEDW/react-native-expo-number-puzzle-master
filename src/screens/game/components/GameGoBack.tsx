@@ -77,8 +77,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 50,
-    borderColor: "#4c00ffff",
-    borderWidth: 2,
   },
   shadowWrap: {
     elevation: 8,

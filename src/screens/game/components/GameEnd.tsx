@@ -1,124 +1,179 @@
 import React from "react";
-import { View, Text, StyleSheet, Dimensions } from "react-native";
+import {
+  StyleSheet,
+  View,
+  Text,
+  Pressable,
+  Dimensions,
+  Modal,
+} from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Button } from "@shared/components";
+import { useFonts } from "expo-font";
 
 const { width, height } = Dimensions.get("window");
 
-type GameEndProps = {
+interface GameEndProps {
   message?: string;
-  score?: number;
-  onPressRestart?: () => void;
-  onPressHome?: () => void;
-};
+  score: number;
+  onPressRestart: () => void;
+  onPressHome: () => void;
+}
 
-const GameEnd = ({
+const GameEnd: React.FC<GameEndProps> = ({
   message,
   score,
   onPressRestart,
   onPressHome,
-}: GameEndProps) => {
+}) => {
+  const [fontsLoaded] = useFonts({
+    "MomoTrustDisplay-Regular": require("@assets/fonts/MomoTrustDisplay-Regular.ttf"),
+  });
+
+  if (!fontsLoaded) return null;
+
   return (
-    <View style={styles.container}>
-      {/* Background gradient */}
-      <LinearGradient
-        colors={["#2a0040", "#120020", "#05000d"]}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <Modal visible={true} transparent animationType="fade" statusBarTranslucent>
+      <View style={styles.overlay}>
+        <View style={styles.container}>
+          <LinearGradient
+            colors={["#1a1a2e", "#16213e"]}
+            style={styles.gradient}
+          >
+            {/* Title */}
+            <Text style={styles.title}>Game Over!</Text>
+            <Text style={styles.subtitle}>
+              {message || "Your journey ends here..."}
+            </Text>
 
-      {/* Main Card */}
-      <View style={styles.card}>
-        <Text style={styles.heading}>Game Over!</Text>
-        <Text style={styles.subheading}>
-          {message || "Your journey ends here..."}
-        </Text>
+            {/* Score Display */}
+            <View style={styles.scoreContainer}>
+              <Text style={styles.scoreLabel}>Score:</Text>
+              <Text style={styles.scoreValue}>{score}</Text>
+            </View>
 
-        <View style={styles.scoreContainer}>
-          <Text style={styles.scoreText}>Score:</Text>
-          <Text style={styles.scoreValue}>{score}</Text>
-        </View>
+            {/* Buttons */}
+            <View style={styles.buttonContainer}>
+              {/* Restart Button */}
+              <Pressable
+                onPress={onPressRestart}
+                style={({ pressed }) => [
+                  styles.buttonWrapper,
+                  pressed && { transform: [{ scale: 0.97 }] },
+                ]}
+              >
+                <LinearGradient
+                  colors={["#5CFF5C", "#1BAE1B"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.button}
+                >
+                  <Text style={styles.buttonText}>Restart</Text>
+                </LinearGradient>
+              </Pressable>
 
-        <View style={styles.buttonRow}>
-          <Button
-            title="Restart"
-            scolor="#5CFF5C"
-            ecolor="#1BAE1B"
-            onPress={onPressRestart}
-            style={styles.button}
-          />
-          <Button
-            title="Home"
-            scolor="#FFD85C"
-            ecolor="#FF9E00"
-            onPress={onPressHome}
-            style={styles.button}
-          />
+              {/* Home Button */}
+              <Pressable
+                onPress={onPressHome}
+                style={({ pressed }) => [
+                  styles.buttonWrapper,
+                  pressed && { transform: [{ scale: 0.97 }] },
+                ]}
+              >
+                <LinearGradient
+                  colors={["#FFC44D", "#FF7A00"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.button}
+                >
+                  <Text style={styles.buttonText}>Home</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </LinearGradient>
         </View>
       </View>
-    </View>
+    </Modal>
   );
 };
 
 export default GameEnd;
 
 const styles = StyleSheet.create({
-  container: {
+  overlay: {
     flex: 1,
-    width: "100%",
-    height: "100%",
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#05000d47",
   },
-  card: {
+  container: {
     width: width * 0.85,
-    paddingVertical: 40,
-    paddingHorizontal: 20,
     borderRadius: 24,
-    alignItems: "center",
-    backgroundColor: "rgba(30, 0, 50, 0.71)",
-
+    overflow: "hidden",
     elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
   },
-  heading: {
+  gradient: {
+    padding: 30,
+    alignItems: "center",
+  },
+  title: {
     fontSize: 42,
     fontWeight: "800",
-    color: "#FFD85C",
-    textShadowColor: "rgba(255, 220, 100, 0.7)",
+    color: "#ffcf40",
+    fontFamily: "MomoTrustDisplay-Regular",
+    marginBottom: 8,
+    textShadowColor: "rgba(255, 207, 64, 0.5)",
     textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
-    marginBottom: 12,
+    textShadowRadius: 20,
   },
-  subheading: {
-    fontSize: 18,
-    color: "#ffffffcc",
-    textAlign: "center",
+  subtitle: {
+    fontSize: 16,
+    color: "#CCC",
     marginBottom: 30,
   },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 10,
-  },
-  button: {
-    flex: 1,
-    marginHorizontal: 6,
-  },
   scoreContainer: {
-    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 40,
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
   },
-  scoreText: {
-    fontSize: 24,
-    color: "#ffffffcc",
-    marginRight: 10,
+  scoreLabel: {
+    fontSize: 18,
+    color: "#999",
+    marginBottom: 8,
   },
   scoreValue: {
-    fontSize: 24,
-    color: "#ffffffcc",
+    fontSize: 48,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    fontFamily: "MomoTrustDisplay-Regular",
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  buttonWrapper: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  button: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: {
+    color: "#131313",
+    fontSize: 20,
+    fontFamily: "MomoTrustDisplay-Regular",
+    fontWeight: "800",
   },
 });

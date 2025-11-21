@@ -1,224 +1,358 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, View, Dimensions, ScrollView } from "react-native";
-
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
-  GameAddButton,
-  GameBackground,
-  GameCard,
-  GameEnd,
-  GameGoBack,
-  GameStars,
-  GameGrid,
-} from "./components";
-
-import { GRID } from "./constants";
-import { Toast } from "@shared/components";
-import { ToastMessageType } from "@shared/components/Toast";
-
+  Dimensions,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { RootStackParamList } from "@shared/types";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { Cell, GameState } from "./engine";
+import {
+  GameBackground,
+  GameStars,
+  GameCard,
+  GameGrid,
+  GameAddButton,
+  GameGoBack,
+  GameEnd,
+} from "./components";
+import GameLevelTransition from "./components/GameLevelTransition";
+import Toast, { ToastMessageType } from "@shared/components/Toast";
+import {
+  GameState,
+  GameEvent,
+  LevelConfig,
+  CellData,
+  Position,
+} from "./engine";
+import { SHOULD_SHOW_TOAST } from "./constants";
+
+type Props = NativeStackScreenProps<RootStackParamList, "Game">;
 
 const { height, width } = Dimensions.get("window");
 const PADDING_HORIZONTAL = width * 0.03;
 const TOP_BAR_HEIGHT = height * 0.2;
 
-type Props = NativeStackScreenProps<RootStackParamList, "Game">;
-
 const MainGameScreen = ({ navigation }: Props) => {
-  const [grid, setGrid] = useState<Cell[][]>([]);
-  const [selectedCells, setSelectedCells] = useState<Cell[]>([]);
-  const [shakingCells, setShakingCells] = useState<string[]>([]);
+  const { height, width } = useWindowDimensions();
 
+  const gameStateRef = useRef<GameState | null>(null);
+  // ref for ScrollView
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [grid, setGrid] = useState<CellData[][]>([]);
   const [score, setScore] = useState(0);
-  const [stage, setStage] = useState(1);
+  const [timer, setTimer] = useState(0);
+  const [addRowUses, setAddRowUses] = useState(0);
+  const [selectedCell, setSelectedCell] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
+  const [isGameOver, setIsGameOver] = useState(false);
+  const [currentLevel, setCurrentLevel] = useState<LevelConfig | null>(null);
 
-  const [gameEnd, setGameEnd] = useState(false);
-  const [endMessage, setEndMessage] = useState("");
+  const [showLevelTransition, setShowLevelTransition] = useState(true);
+  const [isLevelComplete, setIsLevelComplete] = useState(false);
+
+  // ✅ State for shake animation
+  const [invalidCells, setInvalidCells] = useState<Position[]>([]);
 
   const [toasts, setToasts] = useState<ToastMessageType[]>([]);
   const toastIdRef = useRef(0);
 
-  const engineRef = useRef<GameState | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // ------------------------------
-  // INIT ENGINE
-  // ------------------------------
-  useEffect(() => {
-    const engine = new GameState({
-      grid: {
-        rows: GRID.INITIAL_ROWS,
-        cols: GRID.INITIAL_COLS,
-        initialFilled: GRID.INITIAL_FILLED_ROWS,
-      },
-      levels: {
-        1: { target: 10, timeLimit: 30, bonusTime: 3, allowBonus: true },
-        2: { target: 20, timeLimit: 60, bonusTime: 3, allowBonus: true },
-        3: { target: 30, timeLimit: 180, bonusTime: 0, allowBonus: false },
-      },
-    });
-
-    engineRef.current = engine;
-    setGrid(engine.grid.rows);
-
-    engine.onGridChange = (g) => setGrid([...g]);
-    engine.onScore = (s) => setScore(s);
-    engine.onStageChange = (s) => setStage(s);
-
-    return () => {
-      engineRef.current = null;
-    };
-  }, []);
-
-  // ------------------------------
-  // HANDLE CELL PRESS
-  // ------------------------------
-  const handleCellPress = useCallback(
-    async (cell: Cell) => {
-      if (gameEnd) return;
-
-      // First selection
-      if (selectedCells.length === 0) {
-        setSelectedCells([cell]);
-        return;
-      }
-
-      // Second selection: send to engine
-      if (selectedCells.length === 1) {
-        const a = selectedCells[0];
-        const b = cell;
-
-        if (a.row === b.row && a.col === b.col) {
-          setSelectedCells([]);
-          return;
-        }
-
-        const engine = engineRef.current;
-        if (!engine) return;
-
-        const result = engine.select(a, b);
-
-        // if (result.success) {
-        //   // Match happened
-        //   setSelectedCells([]);
-        // } else {
-        //   // INVALID MOVE → shake effect
-        //   setShakingCells([`${a.row}-${a.col}`, `${b.row}-${b.col}`]);
-        //   setTimeout(() => setShakingCells([]), 500);
-
-        //   setSelectedCells([]);
-        // }
-        if (result.success) {
-          setSelectedCells([]);
-        } else {
-          // Decide shake behavior:
-          // - To shake selected cells (recommended): use selected pair
-          // - To highlight/ shake interposing cells: use result.betweenCells
-          const shakeSelectedOnInvalid = false;
-
-          if (shakeSelectedOnInvalid) {
-            setShakingCells([`${a.row}-${a.col}`, `${b.row}-${b.col}`]);
-          } else {
-            setShakingCells(result.betweenCells ?? []);
-          }
-
-          // clear shake after short timeout
-          setTimeout(() => setShakingCells([]), 450);
-          setSelectedCells([]);
-        }
-      }
+  const showToast = useCallback(
+    (message: string, type: ToastMessageType["type"] = "info") => {
+      if (!SHOULD_SHOW_TOAST) return;
+      const id = toastIdRef.current++;
+      setToasts((prev) => [...prev, { id, message, type }]);
     },
-    [selectedCells, gameEnd]
+    []
   );
 
-  // ------------------------------
-  // ADD BUTTON
-  // ------------------------------
-  const handleAddRow = () => {
-    const engine = engineRef.current;
-    if (!engine || gameEnd) return;
+  const hideToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
-    engine.addRow();
-  };
-
-  // ------------------------------
-  // END GAME (stage 3 finish)
-  // ------------------------------
   useEffect(() => {
-    if (stage === 4) {
-      setGameEnd(true);
-      setEndMessage("🎉 You Beat All Stages!");
+    const gameState = new GameState();
+    gameStateRef.current = gameState;
+
+    const handleGridUpdate = (data: CellData[][]) => {
+      setGrid([...data]);
+    };
+
+    const handleScoreUpdate = (data: { score: number }) => {
+      setScore(data.score);
+    };
+
+    const handleTimerUpdate = (data: { timer: number }) => {
+      setTimer(data.timer);
+    };
+
+    const handleTimerExpired = () => {
+      showToast("Time is up!", "error");
+    };
+
+    const handleCellsMatched = () => {
+      showToast("Match!", "success");
+    };
+
+    const handleRowAdded = () => {
+      showToast("Row added!", "info");
+    };
+
+    // ✅ NEW: Listen to cell selection changes
+    const handleCellSelected = (data: { position: Position | null }) => {
+      setSelectedCell(data.position);
+    };
+
+    const handleLevelStarted = (data: { level: LevelConfig }) => {
+      setCurrentLevel(data.level);
+      setIsLevelComplete(false);
+    };
+
+    const handleLevelCompleted = (data: { hasNextLevel: boolean }) => {
+      setIsLevelComplete(true);
+      if (data.hasNextLevel) {
+        showToast("Level Complete!", "success");
+        setShowLevelTransition(true);
+      } else {
+        showToast("🎉 You Won! All levels complete!", "success");
+        setTimeout(() => {
+          setIsGameOver(true);
+        }, 1500);
+      }
+    };
+
+    const handleLevelFailed = () => {
+      showToast("Level Failed!", "error");
+      setTimeout(() => {
+        setIsGameOver(true);
+      }, 1000);
+    };
+
+    const handleGameOver = () => {
+      setIsGameOver(true);
+    };
+
+    gameState.on(GameEvent.GRID_UPDATED, handleGridUpdate);
+    gameState.on(GameEvent.SCORE_UPDATED, handleScoreUpdate);
+    gameState.on(GameEvent.TIMER_UPDATED, handleTimerUpdate);
+    gameState.on(GameEvent.TIMER_EXPIRED, handleTimerExpired);
+    gameState.on(GameEvent.CELLS_MATCHED, handleCellsMatched);
+    gameState.on(GameEvent.ROW_ADDED, handleRowAdded);
+    gameState.on(GameEvent.CELL_SELECTED, handleCellSelected);
+    gameState.on(GameEvent.LEVEL_STARTED, handleLevelStarted);
+    gameState.on(GameEvent.LEVEL_COMPLETED, handleLevelCompleted);
+    gameState.on(GameEvent.LEVEL_FAILED, handleLevelFailed);
+    gameState.on(GameEvent.GAME_OVER, handleGameOver);
+
+    const initialState = gameState.getStateSnapshot();
+    setGrid(initialState.grid);
+    setScore(initialState.score);
+    setTimer(initialState.timer);
+    setAddRowUses(initialState.addRowUses);
+    setCurrentLevel(gameState.getCurrentLevel());
+
+    return () => {
+      gameState.destroy();
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!showLevelTransition && !isGameOver && gameStateRef.current) {
+      timerIntervalRef.current = setInterval(() => {
+        gameStateRef.current?.decrementTimer();
+      }, 1000);
+
+      return () => {
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+        }
+      };
     }
-  }, [stage]);
+  }, [showLevelTransition, isGameOver]);
 
-  // ------------------------------
-  // TOAST HELPERS
-  // ------------------------------
-  const showToast = (
-    message: string,
-    type: "success" | "error" | "warning" | "info" = "info"
-  ) => {
-    const id = toastIdRef.current++;
-    setToasts((prev) => [...prev, { id, message, type }]);
-  };
+  // Updated cell press handler with shake animation
+  const handleCellPress = useCallback((row: number, col: number) => {
+    if (!gameStateRef.current) return;
 
-  const removeToast = (id: number) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
+    const result = gameStateRef.current.selectCell(row, col);
+    // const selected = gameStateRef.current.getSelectedCell();
+    // setSelectedCell(selected);
+    // console.log(selected);
 
-  // ------------------------------
-  // RENDER
-  // ------------------------------
+    if (
+      !result.success &&
+      result.invalidPath &&
+      result.invalidPath.length > 0
+    ) {
+      // Show shake animation on invalid path
+      setInvalidCells(result.invalidPath);
+      setTimeout(() => {
+        setInvalidCells([]);
+      }, 600);
+    }
+  }, []);
+
+  const handleAddRow = useCallback(() => {
+    if (!gameStateRef.current) return;
+
+    const success = gameStateRef.current.addRow();
+    if (!success) {
+      showToast("No empty rows available!", "error");
+    } else {
+      setAddRowUses(gameStateRef.current.getAddRowUses());
+      // ✅ Scroll to the newly added rows after a brief delay
+      setTimeout(() => {
+        if (scrollViewRef.current && gameStateRef.current) {
+          // Calculate the position of the new rows
+          const grid = gameStateRef.current?.getGrid();
+          if (grid) {
+            const filledRows = grid.filter((row) =>
+              row.some((cell) => cell.value !== null)
+            ).length;
+
+            // Scroll to show the new rows (with some offset to see them appearing)
+            const cellSize = (width * 0.94) / (grid[0]?.length || 9);
+            const scrollPosition = (filledRows - 4) * cellSize; // Show 4 rows before the new ones
+
+            scrollViewRef.current.scrollTo({
+              y: Math.max(0, scrollPosition),
+              animated: true,
+            });
+          }
+        }
+      }, 100);
+    }
+  }, [showToast]);
+
+  const handleStartLevel = useCallback(() => {
+    setShowLevelTransition(false);
+
+    if (isLevelComplete && gameStateRef.current) {
+      gameStateRef.current.startNextLevel();
+
+      const newState = gameStateRef.current.getStateSnapshot();
+      setGrid(newState.grid);
+      setScore(newState.score);
+      setTimer(newState.timer);
+      setAddRowUses(newState.addRowUses);
+      setCurrentLevel(gameStateRef.current.getCurrentLevel());
+    }
+  }, [isLevelComplete]);
+
+  const handleRestart = useCallback(() => {
+    if (!gameStateRef.current) return;
+
+    //Clear timer first
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    gameStateRef.current.restartLevel();
+    const newState = gameStateRef.current.getStateSnapshot();
+    setGrid(newState.grid);
+    setScore(newState.score);
+    setTimer(newState.timer);
+    setAddRowUses(newState.addRowUses);
+    setIsGameOver(false);
+    setIsLevelComplete(false);
+    setSelectedCell(null);
+    setInvalidCells([]);
+  }, []);
+
+  const handleGoHome = useCallback(() => {
+    // Clean up timer interval
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    // Destroy game state (removes all event listeners)
+    if (gameStateRef.current) {
+      gameStateRef.current.destroy();
+      gameStateRef.current = null;
+    }
+
+    // Reset UI state
+    setIsGameOver(false);
+    setIsLevelComplete(false);
+    setSelectedCell(null);
+    setInvalidCells([]);
+    setToasts([]);
+
+    // Navigate to home
+    navigation.navigate("Home");
+  }, [navigation]);
+
+  if (!currentLevel) {
+    return null;
+  }
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.gameMainContainer, { height, width }]}>
       <GameBackground />
       <GameStars />
 
-      {!gameEnd && <GameGoBack onPress={() => navigation.goBack()} />}
-
-      {!gameEnd ? (
+      {/* ✅ Only hide game UI when NOT game over */}
+      {!showLevelTransition && (
         <>
-          <View style={styles.topBar}>
+          <View style={styles.header}>
+            <GameGoBack onPress={handleGoHome} />
             <GameCard
-              stage={stage}
+              stage={gameStateRef.current?.getCurrentLevelNumber() || 1}
               score={score}
-              timer={"--:--"} // Timer now handled separately if needed
-              target={
-                stage === 1 ? 10 : stage === 2 ? 20 : stage === 3 ? 30 : 0
-              }
+              timer={timer}
+              target={gameStateRef.current?.getCurrentLevelTargetScore()}
             />
           </View>
 
           <View style={styles.gridArea}>
             <ScrollView
+              ref={scrollViewRef}
               contentContainerStyle={styles.gridContent}
               showsVerticalScrollIndicator={false}
               overScrollMode="never"
             >
               <GameGrid
                 grid={grid}
-                selectedCells={selectedCells}
-                shakingCells={shakingCells}
                 onCellPress={handleCellPress}
+                selectedCell={selectedCell}
+                invalidCells={invalidCells}
               />
             </ScrollView>
           </View>
 
-          <View style={styles.addButtonContainer}>
-            <GameAddButton count={2} disabled={false} onPress={handleAddRow} />
+          <View style={styles.footer}>
+            <GameAddButton
+              count={addRowUses}
+              onPress={handleAddRow}
+              disabled={addRowUses === 0}
+            />
           </View>
         </>
-      ) : (
+      )}
+
+      {showLevelTransition && (
+        <GameLevelTransition
+          visible={showLevelTransition}
+          level={currentLevel}
+          onStartLevel={handleStartLevel}
+          isVictory={isLevelComplete}
+        />
+      )}
+
+      {isGameOver && (
         <GameEnd
-          message={endMessage}
           score={score}
-          onPressRestart={() => navigation.replace("Game")}
-          onPressHome={() =>
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Home" }],
-            })
-          }
+          onPressRestart={handleRestart}
+          onPressHome={handleGoHome}
         />
       )}
 
@@ -227,7 +361,7 @@ const MainGameScreen = ({ navigation }: Props) => {
           key={toast.id}
           message={toast.message}
           type={toast.type}
-          onHide={() => removeToast(toast.id)}
+          onHide={() => hideToast(toast.id)}
         />
       ))}
     </View>
@@ -237,44 +371,56 @@ const MainGameScreen = ({ navigation }: Props) => {
 export default MainGameScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  gameMainContainer: {
     position: "relative",
-    width: "100%",
-    height: "100%",
-    borderColor: "#ff0000ff",
-    borderWidth: 2,
+    flex: 1,
   },
-  topBar: {
+  header: {
     position: "absolute",
     top: 0,
-    width: "100%",
-    height: TOP_BAR_HEIGHT - 22,
-    justifyContent: "flex-end",
-    zIndex: 10,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    // paddingHorizontal: 20,
+    height: 100,
+    zIndex: 20,
+    // borderColor: "red",
+    // borderWidth: 2,
   },
   gridArea: {
     position: "absolute",
-    top: TOP_BAR_HEIGHT - 15,
-    bottom: 0,
-    width: "100%",
-    paddingHorizontal: PADDING_HORIZONTAL,
-  },
-  gridContent: {
-    flexGrow: 1,
-  },
-  addButtonContainer: {
-    position: "absolute",
+    top: 100,
     bottom: 0,
     left: 0,
     right: 0,
-    alignItems: "flex-start",
-    paddingHorizontal: PADDING_HORIZONTAL,
-    justifyContent: "center",
     width: "100%",
-    height: "16%",
-    zIndex: 15,
-    borderColor: "#ddff00ff",
-    borderWidth: 2,
+    height: "68%",
+    // paddingHorizontal: PADDING_HORIZONTAL,
+    // borderColor: "yellow",
+    // borderWidth: 2,
+    // overflow: "scroll",
+  },
+  gridContent: {
+    flexGrow: 1,
+    justifyContent: "center", // ✅ Center the grid
+    alignItems: "center",
+    flex: 1,
+    position: "absolute",
+    top: 10,
+    right: 0,
+    left: 0,
+    // borderColor: "cyan",
+    // borderWidth: 2,
+  },
+
+  footer: {
+    position: "absolute",
+    bottom: 20,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 20,
   },
 });
