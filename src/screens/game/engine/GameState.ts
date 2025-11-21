@@ -211,7 +211,7 @@ export class GameState {
       return { success: true };
     } else {
       // Return path for shake animation
-      const invalidPath = matchResult.path || [];
+      const invalidPath = matchResult.blockingCells || [];
       this.selectedCell = position;
       this.eventEmitter.emit(GameEvent.CELL_SELECTED, {
         position,

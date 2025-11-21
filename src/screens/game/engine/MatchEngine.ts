@@ -7,10 +7,6 @@ import {
 } from "./types";
 import { GridEngine } from "./GridEngine";
 
-// ============================================
-// MATCH ENGINE - Handles Matching Logic
-// ============================================
-
 export class MatchEngine {
   private gridEngine: GridEngine;
   private eventEmitter: IEventEmitter;
@@ -28,22 +24,18 @@ export class MatchEngine {
     const cell1 = this.gridEngine.getCell(pos1.row, pos1.col);
     const cell2 = this.gridEngine.getCell(pos2.row, pos2.col);
 
-    // Validate cells exist and have values
     if (!cell1 || !cell2 || cell1.value === null || cell2.value === null) {
       return { isValid: false, reason: "Invalid cells" };
     }
 
-    // Don't match same cell
     if (pos1.row === pos2.row && pos1.col === pos2.col) {
       return { isValid: false, reason: "Same cell selected" };
     }
 
-    // Don't match faded cells
     if (cell1.faded || cell2.faded) {
       return { isValid: false, reason: "Cell already faded" };
     }
 
-    // Check matching rules: same number OR sum equals 10
     const matchesRule =
       cell1.value === cell2.value || cell1.value + cell2.value === 10;
 
@@ -51,203 +43,232 @@ export class MatchEngine {
       return { isValid: false, reason: "Numbers do not match" };
     }
 
-    // Check if there's a valid path
-    const path = this.findPath(pos1, pos2);
-    if (!path) {
-      return { isValid: false, reason: "No valid path found" };
+    // ✅ NEW: Check path with blocking cells
+    const pathResult = this.findPath(pos1, pos2);
+    if (!pathResult.isValid) {
+      return {
+        isValid: false,
+        reason: "No valid path found",
+        blockingCells: pathResult.blockingCells, // ✅ Return blocking cells
+      };
     }
 
-    return { isValid: true, path };
+    return { isValid: true, path: pathResult.path };
   }
 
   // ============================================
-  // PATH FINDING WITH WRAP-AROUND
+  // PATH FINDING WITH CONTINUOUS LOOP
   // ============================================
 
-  private findPath(start: Position, end: Position): Position[] | null {
-    // Try direct paths (horizontal, vertical, diagonal)
-    const directPath = this.findDirectPath(start, end);
-    if (directPath) return directPath;
-
-    // Try wrap-around paths
-    const wrapPath = this.findWrapAroundPath(start, end);
-    if (wrapPath) return wrapPath;
-
-    return null;
-  }
-
-  private findDirectPath(start: Position, end: Position): Position[] | null {
-    // Horizontal path
-    if (start.row === end.row) {
-      const path = this.getHorizontalPath(start, end);
-      if (this.isPathClear(path)) return path;
-    }
-
-    // Vertical path
-    if (start.col === end.col) {
-      const path = this.getVerticalPath(start, end);
-      if (this.isPathClear(path)) return path;
-    }
-
-    // Diagonal path
-    if (Math.abs(start.row - end.row) === Math.abs(start.col - end.col)) {
-      const path = this.getDiagonalPath(start, end);
-      if (this.isPathClear(path)) return path;
-    }
-
-    return null;
-  }
-
-  private findWrapAroundPath(
+  private findPath(
     start: Position,
     end: Position
-  ): Position[] | null {
+  ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
+    // Try direct paths first
+    const directResult = this.findDirectPath(start, end);
+    if (directResult.isValid) {
+      return directResult;
+    }
+
+    // Try continuous loop wrap-around
+    const loopResult = this.findContinuousLoopPath(start, end);
+    if (loopResult.isValid) {
+      return loopResult;
+    }
+
+    // Return blocking cells from direct path for shake animation
+    return {
+      isValid: false,
+      blockingCells: directResult.blockingCells,
+    };
+  }
+
+  private findDirectPath(
+    start: Position,
+    end: Position
+  ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
+    // Horizontal
+    if (start.row === end.row) {
+      return this.checkHorizontalPath(start, end);
+    }
+
+    // Vertical
+    if (start.col === end.col) {
+      return this.checkVerticalPath(start, end);
+    }
+
+    // Diagonal
+    if (Math.abs(start.row - end.row) === Math.abs(start.col - end.col)) {
+      return this.checkDiagonalPath(start, end);
+    }
+
+    return { isValid: false };
+  }
+
+  // ✅ NEW: Continuous loop wrap-around (like checkPath)
+  private findContinuousLoopPath(
+    start: Position,
+    end: Position
+  ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
     const grid = this.gridEngine.getGrid();
     const rows = grid.length;
     const cols = grid[0].length;
+    const totalCells = rows * cols;
 
-    // Horizontal wrap-around
-    if (start.row === end.row) {
-      const leftPath = this.getHorizontalWrapPath(start, end, cols, "left");
-      if (this.isPathClear(leftPath)) return leftPath;
+    // Convert positions to flat indices
+    const cellIndex = (r: number, c: number) => r * cols + c;
+    const idx1 = cellIndex(start.row, start.col);
+    const idx2 = cellIndex(end.row, end.col);
 
-      const rightPath = this.getHorizontalWrapPath(start, end, cols, "right");
-      if (this.isPathClear(rightPath)) return rightPath;
+    // Always traverse from lowest to highest index
+    const [startIdx, endIdx] = idx1 < idx2 ? [idx1, idx2] : [idx2, idx1];
+
+    // Check direct path (lowest → highest)
+    const directBlocking: Position[] = [];
+    for (let i = startIdx + 1; i < endIdx; i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
+      const cell = grid[r][c];
+      if (cell.value !== null && !cell.faded) {
+        directBlocking.push({ row: r, col: c });
+      }
     }
 
-    // Vertical wrap-around
-    if (start.col === end.col) {
-      const topPath = this.getVerticalWrapPath(start, end, rows, "top");
-      if (this.isPathClear(topPath)) return topPath;
-
-      const bottomPath = this.getVerticalWrapPath(start, end, rows, "bottom");
-      if (this.isPathClear(bottomPath)) return bottomPath;
+    // If direct path is clear, use it
+    if (directBlocking.length === 0) {
+      const path: Position[] = [];
+      for (let i = startIdx; i <= endIdx; i++) {
+        const r = Math.floor(i / cols);
+        const c = i % cols;
+        path.push({ row: r, col: c });
+      }
+      return { isValid: true, path };
     }
 
-    return null;
+    // ✅ Check wrap-around path (end → totalCells → 0 → start)
+    const wrapBlocking: Position[] = [];
+    for (let i = endIdx + 1; i < totalCells + startIdx; i++) {
+      const actualIdx = i % totalCells;
+      const r = Math.floor(actualIdx / cols);
+      const c = actualIdx % cols;
+      const cell = grid[r][c];
+      if (cell.value !== null && !cell.faded) {
+        wrapBlocking.push({ row: r, col: c });
+      }
+    }
+
+    // If wrap path is clear, use it
+    if (wrapBlocking.length === 0) {
+      const path: Position[] = [];
+      // From end to grid end
+      for (let i = endIdx; i < totalCells; i++) {
+        const r = Math.floor(i / cols);
+        const c = i % cols;
+        path.push({ row: r, col: c });
+      }
+      // From grid start to start
+      for (let i = 0; i <= startIdx; i++) {
+        const r = Math.floor(i / cols);
+        const c = i % cols;
+        path.push({ row: r, col: c });
+      }
+      return { isValid: true, path };
+    }
+
+    // Both paths blocked - return blocking cells from direct path
+    return { isValid: false, blockingCells: directBlocking };
   }
 
   // ============================================
-  // PATH GENERATION HELPERS
+  // PATH CHECKING HELPERS WITH BLOCKING CELLS
   // ============================================
 
-  private getHorizontalPath(start: Position, end: Position): Position[] {
-    const path: Position[] = [];
+  private checkHorizontalPath(
+    start: Position,
+    end: Position
+  ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
     const minCol = Math.min(start.col, end.col);
     const maxCol = Math.max(start.col, end.col);
+    const path: Position[] = [];
+    const blocking: Position[] = [];
 
     for (let col = minCol; col <= maxCol; col++) {
+      const cell = this.gridEngine.getCell(start.row, col);
       path.push({ row: start.row, col });
+
+      // Check if cell is blocking (not start/end, has value, not faded)
+      if (
+        col > minCol &&
+        col < maxCol &&
+        cell &&
+        cell.value !== null &&
+        !cell.faded
+      ) {
+        blocking.push({ row: start.row, col });
+      }
     }
-    return path;
+
+    return blocking.length === 0
+      ? { isValid: true, path }
+      : { isValid: false, blockingCells: blocking };
   }
 
-  private getVerticalPath(start: Position, end: Position): Position[] {
-    const path: Position[] = [];
+  private checkVerticalPath(
+    start: Position,
+    end: Position
+  ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
     const minRow = Math.min(start.row, end.row);
     const maxRow = Math.max(start.row, end.row);
+    const path: Position[] = [];
+    const blocking: Position[] = [];
 
     for (let row = minRow; row <= maxRow; row++) {
+      const cell = this.gridEngine.getCell(row, start.col);
       path.push({ row, col: start.col });
+
+      if (
+        row > minRow &&
+        row < maxRow &&
+        cell &&
+        cell.value !== null &&
+        !cell.faded
+      ) {
+        blocking.push({ row, col: start.col });
+      }
     }
-    return path;
+
+    return blocking.length === 0
+      ? { isValid: true, path }
+      : { isValid: false, blockingCells: blocking };
   }
 
-  private getDiagonalPath(start: Position, end: Position): Position[] {
+  private checkDiagonalPath(
+    start: Position,
+    end: Position
+  ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
+    const rowDiff = end.row - start.row;
+    const colDiff = end.col - start.col;
+    const steps = Math.abs(rowDiff);
+    const rowStep = rowDiff / steps;
+    const colStep = colDiff / steps;
+
     const path: Position[] = [];
-    const rowStep = start.row < end.row ? 1 : -1;
-    const colStep = start.col < end.col ? 1 : -1;
+    const blocking: Position[] = [];
 
-    let row = start.row;
-    let col = start.col;
-
-    while (row !== end.row || col !== end.col) {
+    for (let i = 0; i <= steps; i++) {
+      const row = start.row + rowStep * i;
+      const col = start.col + colStep * i;
+      const cell = this.gridEngine.getCell(row, col);
       path.push({ row, col });
-      if (row !== end.row) row += rowStep;
-      if (col !== end.col) col += colStep;
-    }
-    path.push({ row: end.row, col: end.col });
 
-    return path;
-  }
-
-  private getHorizontalWrapPath(
-    start: Position,
-    end: Position,
-    cols: number,
-    direction: "left" | "right"
-  ): Position[] {
-    const path: Position[] = [];
-    const row = start.row;
-
-    if (direction === "left") {
-      // Go left from start to 0, then from cols-1 to end
-      for (let col = start.col; col >= 0; col--) {
-        path.push({ row, col });
-      }
-      for (let col = cols - 1; col >= end.col; col--) {
-        path.push({ row, col });
-      }
-    } else {
-      // Go right from start to cols-1, then from 0 to end
-      for (let col = start.col; col < cols; col++) {
-        path.push({ row, col });
-      }
-      for (let col = 0; col <= end.col; col++) {
-        path.push({ row, col });
+      if (i > 0 && i < steps && cell && cell.value !== null && !cell.faded) {
+        blocking.push({ row, col });
       }
     }
 
-    return path;
-  }
-
-  private getVerticalWrapPath(
-    start: Position,
-    end: Position,
-    rows: number,
-    direction: "top" | "bottom"
-  ): Position[] {
-    const path: Position[] = [];
-    const col = start.col;
-
-    if (direction === "top") {
-      // Go up from start to 0, then from rows-1 to end
-      for (let row = start.row; row >= 0; row--) {
-        path.push({ row, col });
-      }
-      for (let row = rows - 1; row >= end.row; row--) {
-        path.push({ row, col });
-      }
-    } else {
-      // Go down from start to rows-1, then from 0 to end
-      for (let row = start.row; row < rows; row++) {
-        path.push({ row, col });
-      }
-      for (let row = 0; row <= end.row; row++) {
-        path.push({ row, col });
-      }
-    }
-
-    return path;
-  }
-
-  // ============================================
-  // PATH VALIDATION
-  // ============================================
-
-  private isPathClear(path: Position[]): boolean {
-    if (path.length === 0) return false;
-
-    // All cells in path (except start and end) must be null or faded
-    for (let i = 1; i < path.length - 1; i++) {
-      const cell = this.gridEngine.getCell(path[i].row, path[i].col);
-      if (!cell) return false;
-      if (cell.value !== null && !cell.faded) {
-        return false;
-      }
-    }
-
-    return true;
+    return blocking.length === 0
+      ? { isValid: true, path }
+      : { isValid: false, blockingCells: blocking };
   }
 
   // ============================================
@@ -258,15 +279,11 @@ export class MatchEngine {
     const result = this.canMatch(pos1, pos2);
 
     if (result.isValid) {
-      // Fade the matched cells
       this.gridEngine.fadeCells([pos1, pos2]);
-
-      // Emit match event
       this.eventEmitter.emit(GameEvent.CELLS_MATCHED, {
         positions: [pos1, pos2],
         path: result.path,
       });
-
       return true;
     }
 

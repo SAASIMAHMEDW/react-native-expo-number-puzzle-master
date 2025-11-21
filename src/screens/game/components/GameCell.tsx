@@ -1,4 +1,4 @@
-import React, { useEffect, memo } from "react";
+import React, { useEffect } from "react";
 import { StyleSheet, Text, Pressable, View } from "react-native";
 import Animated, {
   useSharedValue,
@@ -6,11 +6,10 @@ import Animated, {
   withSpring,
   withSequence,
   withTiming,
-  withRepeat,
   Easing,
   interpolate,
+  useDerivedValue,
 } from "react-native-reanimated";
-import { CELL_NUMBER_COLORS } from "../constants";
 
 interface GameCellProps {
   value: number | null;
@@ -37,6 +36,19 @@ const GameCell: React.FC<GameCellProps> = ({
   const glowIntensity = useSharedValue(0);
   const bgOpacity = useSharedValue(0);
   const borderOpacity = useSharedValue(0);
+
+  // ✅ Convert props to shared values to avoid frozen object errors
+  const selectedValue = useSharedValue(selected ? 1 : 0);
+  const shouldShakeValue = useSharedValue(shouldShake ? 1 : 0);
+
+  // Update shared values when props change
+  useEffect(() => {
+    selectedValue.value = selected ? 1 : 0;
+  }, [selected]);
+
+  useEffect(() => {
+    shouldShakeValue.value = shouldShake ? 1 : 0;
+  }, [shouldShake]);
 
   // Selection animation - glow effect
   useEffect(() => {
@@ -79,31 +91,15 @@ const GameCell: React.FC<GameCellProps> = ({
   useEffect(() => {
     if (faded) {
       opacity.value = withTiming(0.1, { duration: 300 });
-      scale.value = withTiming(1, { duration: 300 }); // no shrink
+      scale.value = withTiming(1, { duration: 300 });
     } else {
       opacity.value = withTiming(1, { duration: 300 });
     }
   }, [faded]);
 
-  // Shake animation for invalid moves
-  // useEffect(() => {
-  //   if (shouldShake) {
-  //     translateX.value = withSequence(
-  //       withTiming(-6, { duration: 50 }),
-  //       withRepeat(withTiming(6, { duration: 50 }), 5, true),
-  //       withTiming(0, { duration: 50 })
-  //     );
-
-  //     bgOpacity.value = withSequence(
-  //       withTiming(0.8, { duration: 100 }),
-  //       withTiming(0, { duration: 500 })
-  //     );
-  //   }
-  // }, [shouldShake]);
-
+  // Shake animation
   useEffect(() => {
     if (shouldShake) {
-      // Shake animation
       translateX.value = withSequence(
         withTiming(6, { duration: 60 }),
         withTiming(-6, { duration: 60 }),
@@ -111,7 +107,6 @@ const GameCell: React.FC<GameCellProps> = ({
         withTiming(-4, { duration: 60 }),
         withTiming(0, { duration: 50 })
       );
-      // ADD THIS: Red background flash
       bgOpacity.value = withSequence(
         withTiming(1, { duration: 100 }),
         withTiming(0, { duration: 400 })
@@ -132,30 +127,33 @@ const GameCell: React.FC<GameCellProps> = ({
     opacity: bgOpacity.value,
   }));
 
-  // --- BORDER + GLOW STYLE ---
+  // ✅ FIXED: Use string interpolation instead of accessing props
   const cellContainerStyle = useAnimatedStyle(() => {
-    const borderColor = color;
+    "worklet";
     return {
       borderWidth: interpolate(borderOpacity.value, [0, 1], [0, 2]),
-      borderColor: borderColor,
+      borderColor: color || "#00FFF0", // ✅ Direct value, not prop access
       borderRadius: 4,
-      backgroundColor: selected ? `${borderColor}22` : "transparent",
-      shadowColor: borderColor,
+      backgroundColor: selectedValue.value > 0.5 ? `${color}22` : "transparent",
+      shadowColor: color || "#00FFF0",
       shadowOpacity: interpolate(borderOpacity.value, [0, 1], [0, 0.5]),
       shadowRadius: interpolate(borderOpacity.value, [0, 1], [0, 8]),
       shadowOffset: { width: 0, height: 0 },
     };
+  }, [color]); // ✅ Add color as dependency
+
+  // ✅ FIXED: Use shared value instead of prop
+  const shakingBgStyle = useAnimatedStyle(() => {
+    "worklet";
+    const isShaking = shouldShakeValue.value > 0.5;
+    return {
+      backgroundColor: isShaking ? "rgba(255, 60, 60, 0.25)" : "transparent",
+      borderColor: isShaking ? "rgba(255, 60, 60, 0.8)" : "transparent",
+      borderWidth: isShaking ? 2 : 0,
+      transform: [{ scale: isShaking ? 1.05 : 1 }],
+    };
   });
 
-  // --- SHAKE (invalid) STYLE ---
-  const shakingBgStyle = useAnimatedStyle(() => ({
-    backgroundColor: shouldShake ? "rgba(255, 60, 60, 0.25)" : "transparent",
-    borderColor: shouldShake ? "rgba(255, 60, 60, 0.8)" : "transparent",
-    borderWidth: shouldShake ? 2 : 0,
-    transform: [{ scale: shouldShake ? 1.05 : 1 }],
-  }));
-
-  // --- NUMBER ANIMATION STYLE ---
   const numberStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${translateX.value}deg` }, { scale: scale.value }],
     opacity: opacity.value,
@@ -177,7 +175,7 @@ const GameCell: React.FC<GameCellProps> = ({
             {
               width: size + 8,
               height: size + 8,
-              backgroundColor: `${color + "22"}`,
+              backgroundColor: `${color}22`,
               shadowColor: color,
             },
             animatedGlowStyle,
@@ -206,7 +204,6 @@ const GameCell: React.FC<GameCellProps> = ({
           {
             width: size,
             height: size,
-            // backgroundColor: color,
             opacity: pressed ? 0.85 : 1,
           },
         ]}
@@ -216,7 +213,7 @@ const GameCell: React.FC<GameCellProps> = ({
             styles.text,
             {
               fontSize: size * 0.7,
-              color: selected ? "#FFFFFF" : color, // ✅ White when selected, color when not
+              color: selected ? "#FFFFFF" : color,
               textShadowColor: selected ? "rgba(0, 0, 0, 0.8)" : "transparent",
             },
             numberStyle,
@@ -238,7 +235,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 4,
-    overflow: "visible", // allow glow to extend outside cell
+    overflow: "visible",
   },
   emptyCell: {
     backgroundColor: "transparent",
@@ -252,20 +249,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     elevation: 20,
   },
-  numberContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    width: "100%",
-    height: "100%",
-  },
   cell: {
     borderRadius: 8,
     justifyContent: "center",
     alignItems: "center",
-    // shadowColor: "#000",
-    // shadowOffset: { width: 0, height: 3 },
-    // shadowOpacity: 0.4,
-    // shadowRadius: 4,
     elevation: 5,
   },
   text: {

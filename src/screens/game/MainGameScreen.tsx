@@ -27,7 +27,7 @@ import {
   Position,
 } from "./engine";
 import { SHOULD_SHOW_TOAST } from "./constants";
-
+import { impactAsync, ImpactFeedbackStyle } from "expo-haptics";
 type Props = NativeStackScreenProps<RootStackParamList, "Game">;
 
 const { height, width } = Dimensions.get("window");
@@ -181,6 +181,8 @@ const MainGameScreen = ({ navigation }: Props) => {
   // Updated cell press handler with shake animation
   const handleCellPress = useCallback((row: number, col: number) => {
     if (!gameStateRef.current) return;
+
+    impactAsync(ImpactFeedbackStyle.Light);
 
     const result = gameStateRef.current.selectCell(row, col);
     // const selected = gameStateRef.current.getSelectedCell();

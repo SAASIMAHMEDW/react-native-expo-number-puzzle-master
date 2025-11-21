@@ -20,6 +20,7 @@ export interface MatchResult {
   isValid: boolean;
   path?: Position[];
   reason?: string;
+  blockingCells?: Position[];
 }
 
 export interface LevelConfig {
@@ -45,7 +46,7 @@ export interface GameStateData {
   isGameOver: boolean;
   isPaused: boolean;
   grid: CellData[][];
-  currentLevelTargetScore: number
+  currentLevelTargetScore: number;
 }
 
 // ============================================
