@@ -1,7 +1,4 @@
-// ============================================
-// ENGINE EXPORTS
-// Clean API for consuming components
-// ============================================
+
 
 export { EventEmitter } from "./EventEmitter";
 export { GridEngine } from "./GridEngine";

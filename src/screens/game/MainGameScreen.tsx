@@ -53,8 +53,9 @@ const MainGameScreen = ({ navigation }: Props) => {
 
   const [showLevelTransition, setShowLevelTransition] = useState(true);
   const [isLevelComplete, setIsLevelComplete] = useState(false);
-
-  // ✅ State for shake animation
+  const [stage, setStage] = useState(1);
+  const [targetScore, setTargetScore] = useState(0);
+  // State for shake animation
   const [invalidCells, setInvalidCells] = useState<Position[]>([]);
 
   const [toasts, setToasts] = useState<ToastMessageType[]>([]);
@@ -103,7 +104,7 @@ const MainGameScreen = ({ navigation }: Props) => {
       showToast("Row added!", "info");
     };
 
-    // ✅ NEW: Listen to cell selection changes
+    // Subscribe to cell selection changes
     const handleCellSelected = (data: { position: Position | null }) => {
       setSelectedCell(data.position);
     };
@@ -155,6 +156,8 @@ const MainGameScreen = ({ navigation }: Props) => {
     setTimer(initialState.timer);
     setAddRowUses(initialState.addRowUses);
     setCurrentLevel(gameState.getCurrentLevel());
+    setStage(gameState.getCurrentLevelNumber());
+    setTargetScore(gameState.getCurrentLevelTargetScore());
 
     return () => {
       gameState.destroy();
@@ -182,7 +185,7 @@ const MainGameScreen = ({ navigation }: Props) => {
   const handleCellPress = useCallback((row: number, col: number) => {
     if (!gameStateRef.current) return;
 
-    impactAsync(ImpactFeedbackStyle.Light);
+    impactAsync(ImpactFeedbackStyle.Soft);
 
     const result = gameStateRef.current.selectCell(row, col);
     // const selected = gameStateRef.current.getSelectedCell();
@@ -210,7 +213,7 @@ const MainGameScreen = ({ navigation }: Props) => {
       showToast("No empty rows available!", "error");
     } else {
       setAddRowUses(gameStateRef.current.getAddRowUses());
-      // ✅ Scroll to the newly added rows after a brief delay
+      // Scroll to the newly added rows after a brief delay
       setTimeout(() => {
         if (scrollViewRef.current && gameStateRef.current) {
           // Calculate the position of the new rows
@@ -246,6 +249,8 @@ const MainGameScreen = ({ navigation }: Props) => {
       setTimer(newState.timer);
       setAddRowUses(newState.addRowUses);
       setCurrentLevel(gameStateRef.current.getCurrentLevel());
+      setStage(newState.currentLevel);
+      setTargetScore(newState.currentLevelTargetScore);
     }
   }, [isLevelComplete]);
 
@@ -302,16 +307,16 @@ const MainGameScreen = ({ navigation }: Props) => {
       <GameBackground />
       <GameStars />
 
-      {/* ✅ Only hide game UI when NOT game over */}
+      {/* Only hide game UI when NOT game over */}
       {!showLevelTransition && (
         <>
           <View style={styles.header}>
             <GameGoBack onPress={handleGoHome} />
             <GameCard
-              stage={gameStateRef.current?.getCurrentLevelNumber() || 1}
+              stage={stage}
               score={score}
               timer={timer}
-              target={gameStateRef.current?.getCurrentLevelTargetScore()}
+              target={targetScore}
             />
           </View>
 
@@ -386,14 +391,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     // paddingHorizontal: 20,
-    height: 100,
+    height: "15%",
     zIndex: 20,
     // borderColor: "red",
     // borderWidth: 2,
   },
   gridArea: {
     position: "absolute",
-    top: 100,
+    top: "15%",
     bottom: 0,
     left: 0,
     right: 0,
@@ -406,7 +411,7 @@ const styles = StyleSheet.create({
   },
   gridContent: {
     flexGrow: 1,
-    justifyContent: "center", // ✅ Center the grid
+    justifyContent: "center", 
     alignItems: "center",
     flex: 1,
     position: "absolute",

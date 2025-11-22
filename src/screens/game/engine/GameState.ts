@@ -139,7 +139,7 @@ export class GameState {
     };
   }
 
-  // ✅ Updated to return match status and path info
+  //  return match status and path info
   selectCell(
     row: number,
     col: number
@@ -178,17 +178,17 @@ export class GameState {
     const matchResult = this.matchEngine.canMatch(this.selectedCell, position);
 
     if (matchResult.isValid) {
-      // ✅ Store the first cell position
+      // Store the first cell position
       const firstCell = this.selectedCell;
 
-      // ✅ Set the second cell as selected (so both show glow)
+      // Set the second cell as selected (so both show glow)
       this.selectedCell = position;
       this.eventEmitter.emit(GameEvent.CELL_SELECTED, {
         position,
         isFirst: false,
       });
 
-      // ✅ Wait 400ms to show both cells selected
+      // Wait 400ms to show both cells selected
       setTimeout(() => {
         // Execute the match
         this.matchEngine.executeMatch(firstCell, position);
@@ -314,6 +314,7 @@ export class GameState {
       this.selectedCell = null;
       this.timerBoostCount = 0;
       this.isPaused = false;
+      this.currentLevelTargetScore = nextLevel.targetScore;
 
       this.eventEmitter.emit(GameEvent.GAME_STARTED, this.getStateSnapshot());
     }
@@ -321,6 +322,7 @@ export class GameState {
 
   restartLevel(): void {
     const level = this.levelManager.restartCurrentLevel();
+    // const level = this.levelManager.startLevel();
 
     this.gridEngine = new GridEngine(
       level.initialRows,

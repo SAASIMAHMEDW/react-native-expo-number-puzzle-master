@@ -1,6 +1,6 @@
 import { CellData, Position, IEventEmitter, GameEvent } from "./types";
 import { EventEmitter } from "./EventEmitter";
-import { getRandomNeonColor } from "../constants/NEON_COLORS"; // ✅ Import
+import { getRandomNeonColor } from "../constants/NEON_COLORS"; 
 
 export class GridEngine {
   private grid: CellData[][];
@@ -33,13 +33,13 @@ export class GridEngine {
       col: c,
       value: Math.ceil(Math.random() * 9),
       faded: false,
-      color: getRandomNeonColor(), // ✅ Assign random neon color
+      color: getRandomNeonColor(), 
     }));
   }
   private generateRow(rowIndex: number): CellData[] {
     return Array.from({ length: this.cols }).map((_, c) => ({
       id: this.makeId(rowIndex, c),
-      row: rowIndex, // Uses the actual row index passed in
+      row: rowIndex, 
       col: c,
       value: Math.ceil(Math.random() * 9),
       faded: false,
@@ -171,7 +171,7 @@ export class GridEngine {
       }
     }
 
-    // ✅ NEW: If no empty rows, expand the grid!
+    // If no empty rows, expand the grid!
     if (emptyRows.length === 0) {
       const rowsToCreate = this.lastAddedRowCount;
       const startRow = this.rows; // Start from current end
@@ -194,7 +194,7 @@ export class GridEngine {
       return true;
     }
 
-    // ✅ Fill existing empty rows
+    // Fill existing empty rows
     const rowsToAdd = Math.min(this.lastAddedRowCount, emptyRows.length);
 
     if (rowsToAdd === 0) {

@@ -65,6 +65,7 @@ const GameLevelTransition: React.FC<GameLevelTransitionProps> = ({
                 style={styles.badge}
               >
                 <Text style={styles.badgeText}>LEVEL {level.id}</Text>
+                {isVictory && <Text style={styles.badgeText}>VICTORY</Text>}
               </LinearGradient>
             </View>
 

@@ -21,21 +21,10 @@ const GameGrid: React.FC<GameGridProps> = ({
   const cols = grid[0]?.length || 9;
   const rows = grid.length;
 
-  // // ✅ Calculate based on actual screen dimensions
-  // const TOP_BAR_HEIGHT = height * 0.2;
-  // const FOOTER_HEIGHT = 100;
-  // const PADDING = 20;
-  // ✅ FIXED CELL SIZE - doesn't change with number of rows
-  const availableWidth = width * 0.94;
-  const FIXED_CELL_SIZE = availableWidth / cols; // Only based on columns, not rows!
-  // // Available space = total height - (top bar + footer + padding)
-  // const availableHeight = height - TOP_BAR_HEIGHT - FOOTER_HEIGHT - PADDING;
-  // const availableWidth = width * 0.94; // Account for horizontal padding
 
-  // // Calculate cell size from both dimensions and use the smaller one
-  // const cellSizeFromWidth = availableWidth / cols;
-  // const cellSizeFromHeight = availableHeight / rows;
-  // const cellSize = Math.min(cellSizeFromWidth, cellSizeFromHeight);
+  const availableWidth = width * 0.94;
+  const FIXED_CELL_SIZE = availableWidth / cols;
+ 
   return (
     <View style={styles.container}>
       <View

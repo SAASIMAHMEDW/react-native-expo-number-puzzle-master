@@ -2,7 +2,6 @@ import { LevelConfig, IEventEmitter, GameEvent } from "./types";
 
 // ============================================
 // LEVEL MANAGER - Reusable Across Games
-// SOLID Principles Applied
 // ============================================
 
 export interface LevelProgressionStrategy {
@@ -189,7 +188,6 @@ export class LevelManager {
 
 // ============================================
 // SCORE-BASED PROGRESSION STRATEGY
-// For Number Puzzle Game
 // ============================================
 
 export class ScoreBasedProgressionStrategy implements LevelProgressionStrategy {
@@ -216,7 +214,6 @@ export class ScoreBasedProgressionStrategy implements LevelProgressionStrategy {
 
 // ============================================
 // XP-BASED PROGRESSION STRATEGY
-// Example for other types of games
 // ============================================
 
 export class XPBasedProgressionStrategy implements LevelProgressionStrategy {
@@ -240,7 +237,6 @@ export class XPBasedProgressionStrategy implements LevelProgressionStrategy {
 
 // ============================================
 // WAVE-BASED PROGRESSION STRATEGY
-// Example for survival/wave games
 // ============================================
 
 export class WaveBasedProgressionStrategy implements LevelProgressionStrategy {

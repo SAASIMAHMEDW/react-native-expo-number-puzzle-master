@@ -34,10 +34,10 @@ const GameCell: React.FC<GameCellProps> = ({
   const opacity = useSharedValue(1);
   const translateX = useSharedValue(0);
   const glowIntensity = useSharedValue(0);
+
   const bgOpacity = useSharedValue(0);
   const borderOpacity = useSharedValue(0);
-
-  // ✅ Convert props to shared values to avoid frozen object errors
+  const colorValue = useSharedValue(color);
   const selectedValue = useSharedValue(selected ? 1 : 0);
   const shouldShakeValue = useSharedValue(shouldShake ? 1 : 0);
 
@@ -45,6 +45,10 @@ const GameCell: React.FC<GameCellProps> = ({
   useEffect(() => {
     selectedValue.value = selected ? 1 : 0;
   }, [selected]);
+
+  useEffect(() => {
+    colorValue.value = color;
+  }, [color]);
 
   useEffect(() => {
     shouldShakeValue.value = shouldShake ? 1 : 0;
@@ -77,7 +81,7 @@ const GameCell: React.FC<GameCellProps> = ({
     if (value != null && !faded) {
       opacity.value = withSequence(
         withTiming(0, { duration: 0 }),
-        withTiming(1, { duration: 400, easing: Easing.out(Easing.cubic) })
+        withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) })
       );
       scale.value = withSequence(
         withTiming(0.3, { duration: 0 }),
@@ -90,7 +94,7 @@ const GameCell: React.FC<GameCellProps> = ({
   // Fade animation
   useEffect(() => {
     if (faded) {
-      opacity.value = withTiming(0.1, { duration: 300 });
+      opacity.value = withTiming(0.3, { duration: 300 });
       scale.value = withTiming(1, { duration: 300 });
     } else {
       opacity.value = withTiming(1, { duration: 300 });
@@ -127,12 +131,10 @@ const GameCell: React.FC<GameCellProps> = ({
     opacity: bgOpacity.value,
   }));
 
-  // ✅ FIXED: Use string interpolation instead of accessing props
   const cellContainerStyle = useAnimatedStyle(() => {
-    "worklet";
     return {
       borderWidth: interpolate(borderOpacity.value, [0, 1], [0, 2]),
-      borderColor: color || "#00FFF0", // ✅ Direct value, not prop access
+      borderColor: color || "#00FFF0", 
       borderRadius: 4,
       backgroundColor: selectedValue.value > 0.5 ? `${color}22` : "transparent",
       shadowColor: color || "#00FFF0",
@@ -140,16 +142,16 @@ const GameCell: React.FC<GameCellProps> = ({
       shadowRadius: interpolate(borderOpacity.value, [0, 1], [0, 8]),
       shadowOffset: { width: 0, height: 0 },
     };
-  }, [color]); // ✅ Add color as dependency
+  });
 
-  // ✅ FIXED: Use shared value instead of prop
+  // Use shared value instead of prop
   const shakingBgStyle = useAnimatedStyle(() => {
-    "worklet";
     const isShaking = shouldShakeValue.value > 0.5;
     return {
       backgroundColor: isShaking ? "rgba(255, 60, 60, 0.25)" : "transparent",
       borderColor: isShaking ? "rgba(255, 60, 60, 0.8)" : "transparent",
       borderWidth: isShaking ? 2 : 0,
+      // opacity: isShaking ? 1 : 0,
       transform: [{ scale: isShaking ? 1.05 : 1 }],
     };
   });
@@ -199,16 +201,19 @@ const GameCell: React.FC<GameCellProps> = ({
       <Pressable
         onPress={onPress}
         disabled={faded}
+        android_ripple={null}
         style={({ pressed }) => [
           styles.cell,
           {
             width: size,
             height: size,
             opacity: pressed ? 0.85 : 1,
+            backgroundColor: "transparent",
+            overflow: "hidden",
           },
         ]}
       >
-        <Text
+        <Animated.Text
           style={[
             styles.text,
             {
@@ -220,7 +225,7 @@ const GameCell: React.FC<GameCellProps> = ({
           ]}
         >
           {value}
-        </Text>
+        </Animated.Text>
       </Pressable>
     </Animated.View>
   );
@@ -235,7 +240,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 4,
-    overflow: "visible",
+    backgroundColor: "transparent",
+    overflow: "hidden",
   },
   emptyCell: {
     backgroundColor: "transparent",
@@ -250,20 +256,27 @@ const styles = StyleSheet.create({
     elevation: 20,
   },
   cell: {
-    borderRadius: 8,
+    borderRadius: 0,
     justifyContent: "center",
     alignItems: "center",
-    elevation: 5,
+    backgroundColor: "transparent",
+    // elevation: 5,
   },
   text: {
     fontWeight: "900",
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 4,
+    width: "100%",
+    height: "100%",
+    textAlign: "center",
+    backgroundColor: "transparent",
+    includeFontPadding: false,
+    textAlignVertical: "center",
   },
   shakeBg: {
     position: "absolute",
-    backgroundColor: "#ff000075",
+    // backgroundColor: "transparent",
     borderRadius: 8,
     zIndex: -1,
+    backgroundColor: "transparent",
+    overflow: "hidden",
   },
 });

@@ -43,13 +43,13 @@ export class MatchEngine {
       return { isValid: false, reason: "Numbers do not match" };
     }
 
-    // ✅ NEW: Check path with blocking cells
+    // Check path with blocking cells
     const pathResult = this.findPath(pos1, pos2);
     if (!pathResult.isValid) {
       return {
         isValid: false,
         reason: "No valid path found",
-        blockingCells: pathResult.blockingCells, // ✅ Return blocking cells
+        blockingCells: pathResult.blockingCells, // Return blocking cells
       };
     }
 
@@ -105,8 +105,8 @@ export class MatchEngine {
     return { isValid: false };
   }
 
-  // ✅ NEW: Continuous loop wrap-around (like checkPath)
-  private findContinuousLoopPath(
+  // Continuous loop wrap-around (like checkPath)
+  private findContinuousLoopPathOLDY(
     start: Position,
     end: Position
   ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
@@ -145,7 +145,7 @@ export class MatchEngine {
       return { isValid: true, path };
     }
 
-    // ✅ Check wrap-around path (end → totalCells → 0 → start)
+    // Check wrap-around path (end → totalCells → 0 → start)
     const wrapBlocking: Position[] = [];
     for (let i = endIdx + 1; i < totalCells + startIdx; i++) {
       const actualIdx = i % totalCells;
@@ -177,6 +177,167 @@ export class MatchEngine {
 
     // Both paths blocked - return blocking cells from direct path
     return { isValid: false, blockingCells: directBlocking };
+  }
+  private findContinuousLoopPathX(
+    start: Position,
+    end: Position
+  ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
+    const grid = this.gridEngine.getGrid();
+    const rows = grid.length;
+    const cols = grid[0].length;
+    const totalCells = rows * cols;
+
+    // Convert positions to flat indices
+    const cellIndex = (r: number, c: number) => r * cols + c;
+    const idx1 = cellIndex(start.row, start.col);
+    const idx2 = cellIndex(end.row, end.col);
+
+    // Always traverse from lowest to highest index
+    const [startIdx, endIdx] = idx1 < idx2 ? [idx1, idx2] : [idx2, idx1];
+
+    // Check direct path (lowest → highest)
+    const directBlocking: Position[] = [];
+    for (let i = startIdx + 1; i < endIdx; i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
+      const cell = grid[r][c];
+      if (cell && cell.value !== null && !cell.faded) {
+        // Added cell check
+        directBlocking.push({ row: r, col: c });
+      }
+    }
+
+    // If direct path is clear, use it
+    if (directBlocking.length === 0) {
+      const path: Position[] = [];
+      for (let i = startIdx; i <= endIdx; i++) {
+        const r = Math.floor(i / cols);
+        const c = i % cols;
+        path.push({ row: r, col: c });
+      }
+      return { isValid: true, path };
+    }
+
+    // Check wrap-around path (end → totalCells → 0 → start)
+    const wrapBlocking: Position[] = [];
+    for (let i = endIdx + 1; i < totalCells + startIdx; i++) {
+      const actualIdx = i % totalCells;
+      const r = Math.floor(actualIdx / cols);
+      const c = actualIdx % cols;
+      const cell = grid[r]?.[c]; // ✅ Safe array access
+      if (cell && cell.value !== null && !cell.faded) {
+        wrapBlocking.push({ row: r, col: c });
+      }
+    }
+
+    // If wrap path is clear, use it
+    if (wrapBlocking.length === 0) {
+      const path: Position[] = [];
+      // From end to grid end
+      for (let i = endIdx; i < totalCells; i++) {
+        const r = Math.floor(i / cols);
+        const c = i % cols;
+        path.push({ row: r, col: c });
+      }
+      // From grid start to start
+      for (let i = 0; i <= startIdx; i++) {
+        const r = Math.floor(i / cols);
+        const c = i % cols;
+        path.push({ row: r, col: c });
+      }
+      return { isValid: true, path };
+    }
+
+    // Return the shorter blocking path
+    const shorterBlocking =
+      directBlocking.length < wrapBlocking.length
+        ? directBlocking
+        : wrapBlocking;
+
+    return { isValid: false, blockingCells: shorterBlocking };
+  }
+  private findContinuousLoopPath(
+    start: Position,
+    end: Position
+  ): { isValid: boolean; path?: Position[]; blockingCells?: Position[] } {
+    const grid = this.gridEngine.getGrid();
+    const rows = grid.length;
+    const cols = grid[0].length;
+    const totalCells = rows * cols;
+
+    const cellIndex = (r: number, c: number) => r * cols + c;
+    const idx1 = cellIndex(start.row, start.col);
+    const idx2 = cellIndex(end.row, end.col);
+
+    // IMPORTANT: Check BOTH directions for continuous loop
+    const [startIdx, endIdx] = idx1 < idx2 ? [idx1, idx2] : [idx2, idx1];
+
+    // Direction 1: Direct path (lower index → higher index)
+    const directBlocking: Position[] = [];
+    const directPath: Position[] = [];
+    for (let i = startIdx; i <= endIdx; i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
+      directPath.push({ row: r, col: c });
+
+      // Skip first and last (selected cells)
+      if (i > startIdx && i < endIdx && r < rows && c < cols) {
+        const cell = grid[r][c];
+        if (cell && cell.value !== null && !cell.faded) {
+          directBlocking.push({ row: r, col: c });
+        }
+      }
+    }
+
+    // If direct path clear, use it
+    if (directBlocking.length === 0) {
+      return { isValid: true, path: directPath };
+    }
+
+    // Direction 2: Wrap-around path (higher → end, start → lower)
+    const wrapBlocking: Position[] = [];
+    const wrapPath: Position[] = [];
+
+    // From higher index to end of grid
+    for (let i = endIdx; i < totalCells; i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
+      wrapPath.push({ row: r, col: c });
+
+      if (i > endIdx && r < rows && c < cols) {
+        const cell = grid[r][c];
+        if (cell && cell.value !== null && !cell.faded) {
+          wrapBlocking.push({ row: r, col: c });
+        }
+      }
+    }
+
+    // From start of grid to lower index
+    for (let i = 0; i <= startIdx; i++) {
+      const r = Math.floor(i / cols);
+      const c = i % cols;
+      wrapPath.push({ row: r, col: c });
+
+      if (i < startIdx && r < rows && c < cols) {
+        const cell = grid[r][c];
+        if (cell && cell.value !== null && !cell.faded) {
+          wrapBlocking.push({ row: r, col: c });
+        }
+      }
+    }
+
+    // If wrap path clear, use it
+    if (wrapBlocking.length === 0) {
+      return { isValid: true, path: wrapPath };
+    }
+
+    // Both blocked - return cells from the SHORTER blocking path
+    const shorterBlocking =
+      directBlocking.length <= wrapBlocking.length
+        ? directBlocking
+        : wrapBlocking;
+
+    return { isValid: false, blockingCells: shorterBlocking };
   }
 
   // ============================================
